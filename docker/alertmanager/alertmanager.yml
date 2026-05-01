@@ -1,0 +1,90 @@
+global:
+  resolve_timeout: 5m
+  # 企业微信webhook配置
+  wechat_api_url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WECHAT_WEBHOOK_KEY'
+  # 邮件配置
+  smtp_smarthost: 'smtp.qq.com:465'
+  smtp_from: 'alerts@remuse.top'
+  smtp_auth_username: 'alerts@remuse.top'
+  smtp_auth_password: 'YOUR_EMAIL_PASSWORD'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'wechat'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'wechat-and-email'
+    - match:
+        severity: warning
+      receiver: 'wechat'
+    - match:
+        severity: info
+      receiver: 'wechat'
+
+receivers:
+  - name: 'wechat'
+    wechat_configs:
+      - send_resolved: true
+        to_user: '@all'
+        agentid: '1000002'
+        corp_id: 'YOUR_CORP_ID'
+        api_secret: 'YOUR_CORP_SECRET'
+        message_type: 'markdown'
+        title: '【Re-MUSE系统告警】'
+        description: |
+          ## 告警信息
+          **告警名称**: {{ .CommonLabels.alertname }}
+          **告警级别**: {{ .CommonLabels.severity }}
+          **实例**: {{ .CommonLabels.instance }}
+          **告警时间**: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          
+          **详情**:
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+  - name: 'wechat-and-email'
+    wechat_configs:
+      - send_resolved: true
+        to_user: '@all'
+        agentid: '1000002'
+        corp_id: 'YOUR_CORP_ID'
+        api_secret: 'YOUR_CORP_SECRET'
+        message_type: 'markdown'
+        title: '【紧急告警】Re-MUSE系统告警'
+        description: |
+          ## 🚨 紧急告警
+          **告警名称**: {{ .CommonLabels.alertname }}
+          **告警级别**: 严重
+          **实例**: {{ .CommonLabels.instance }}
+          **告警时间**: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          
+          **详情**:
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          {{ end }}
+    email_configs:
+      - send_resolved: true
+        to: 'admin@remuse.top, dev@remuse.top'
+        subject: '【紧急告警】Re-MUSE系统发生严重故障'
+        html: |
+          <h1>🚨 系统紧急告警</h1>
+          <p><strong>告警名称:</strong> {{ .CommonLabels.alertname }}</p>
+          <p><strong>告警级别:</strong> 严重</p>
+          <p><strong>发生时间:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05" }}</p>
+          <hr>
+          {{ range .Alerts }}
+          <p>{{ .Annotations.description }}</p>
+          {{ end }}
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
