@@ -4,6 +4,20 @@ const jwt = require('jsonwebtoken')
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
+const {
+  getConfig: getFeishuConfig,
+  getTenantAccessToken,
+  getDocumentInfo,
+  getDocumentBlocks,
+  appendPlainText,
+  appendItemSummary
+} = require('./src/services/feishuService')
+
+try {
+  require('dotenv').config({ path: path.join(__dirname, '.env') })
+} catch (error) {
+  // dotenv is optional here; env vars can also be provided by the shell.
+}
 
 const app = express()
 const PORT = 3001
@@ -259,6 +273,109 @@ app.post('/api/miniprogram/upload', authMiddleware, upload.single('file'), (req,
     filename: req.file.filename,
     size: req.file.size
   })
+})
+
+// 飞书连接状态
+app.get('/api/feishu/status', authMiddleware, async (req, res) => {
+  const config = getFeishuConfig()
+
+  res.json({
+    configured: Boolean(config.appId && config.appSecret),
+    hasDocumentId: Boolean(config.documentId),
+    documentId: config.documentId || null,
+    appIdPreview: config.appId ? `${config.appId.slice(0, 6)}...${config.appId.slice(-4)}` : null
+  })
+})
+
+// 测试飞书鉴权
+app.post('/api/feishu/test-auth', authMiddleware, async (req, res) => {
+  try {
+    const token = await getTenantAccessToken()
+
+    res.json({
+      success: true,
+      message: '飞书鉴权成功',
+      tokenPreview: `${token.slice(0, 8)}...${token.slice(-6)}`
+    })
+  } catch (error) {
+    console.error('飞书鉴权失败:', error)
+    res.status(500).json({ error: error.message || '飞书鉴权失败' })
+  }
+})
+
+// 获取飞书文档概览
+app.get('/api/feishu/document', authMiddleware, async (req, res) => {
+  try {
+    const documentId = req.query.documentId || process.env.FEISHU_DOC_ID
+    const document = await getDocumentInfo(documentId)
+    const blocks = await getDocumentBlocks(documentId)
+
+    res.json({
+      success: true,
+      documentId,
+      title: document?.document?.title || null,
+      revisionId: document?.document?.revision_id || null,
+      blockCount: blocks.length
+    })
+  } catch (error) {
+    console.error('获取飞书文档失败:', error)
+    res.status(500).json({ error: error.message || '获取飞书文档失败' })
+  }
+})
+
+// 追加自定义文本到飞书文档
+app.post('/api/feishu/document/append', authMiddleware, async (req, res) => {
+  try {
+    const { documentId, title, content, lines } = req.body
+    const normalizedLines = Array.isArray(lines)
+      ? lines
+      : String(content || '')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+
+    const result = await appendPlainText({
+      documentId,
+      title,
+      lines: normalizedLines
+    })
+
+    res.json({
+      success: true,
+      message: '内容已追加到飞书文档',
+      result
+    })
+  } catch (error) {
+    console.error('追加飞书文档内容失败:', error)
+    res.status(500).json({ error: error.message || '追加飞书文档内容失败' })
+  }
+})
+
+// 将当前系统中的藏品摘要同步到飞书文档
+app.post('/api/feishu/sync/item/:id', authMiddleware, async (req, res) => {
+  try {
+    const { documentId } = req.body
+    const item = items.find((candidate) => candidate.id === req.params.id && candidate.userId === req.user.id)
+
+    if (!item) {
+      return res.status(404).json({ error: '藏品不存在' })
+    }
+
+    const result = await appendItemSummary({
+      documentId,
+      item
+    })
+
+    res.json({
+      success: true,
+      message: '藏品已同步到飞书文档',
+      itemId: item.id,
+      result
+    })
+  } catch (error) {
+    console.error('同步藏品到飞书失败:', error)
+    res.status(500).json({ error: error.message || '同步藏品到飞书失败' })
+  }
 })
 
 // 健康检查
