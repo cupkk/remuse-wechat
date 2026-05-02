@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { AppSessionUser, GeneratedAssetRecord, ItemRecord, ScreenType } from "../app/types";
 
 interface ProfileScreenProps {
@@ -5,6 +6,7 @@ interface ProfileScreenProps {
   items: ItemRecord[];
   generatedAssets: GeneratedAssetRecord[];
   onNavigate: (screen: ScreenType) => void;
+  onLogout: () => void;
 }
 
 const kindLabel: Record<string, string> = {
@@ -14,7 +16,8 @@ const kindLabel: Record<string, string> = {
   guide: "改造"
 };
 
-export function ProfileScreen({ sessionUser, items, generatedAssets, onNavigate }: ProfileScreenProps) {
+export function ProfileScreen({ sessionUser, items, generatedAssets, onNavigate, onLogout }: ProfileScreenProps) {
+  const [showSettings, setShowSettings] = useState(false);
   const displayName = sessionUser?.nickname || (sessionUser?.isGuest ? "游客身份" : "旧物收藏家");
   const recentAssets = generatedAssets.slice(0, 4);
   const calendar = buildChinaCalendar(items, generatedAssets);
@@ -29,6 +32,12 @@ export function ProfileScreen({ sessionUser, items, generatedAssets, onNavigate 
             <span>{items.length}</span> 件藏品&nbsp;·&nbsp; <span>{generatedAssets.length}</span> 个成果
           </div>
         </div>
+        <button className="profile-settings-btn" type="button" onClick={() => setShowSettings(true)} aria-label="设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z" />
+            <path d="M19.4 13.5a7.9 7.9 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8.5 8.5 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8.5 8.5 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.9 7.9 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8.5 8.5 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8.5 8.5 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" />
+          </svg>
+        </button>
       </div>
 
       <section className="profile-summary">
@@ -80,6 +89,35 @@ export function ProfileScreen({ sessionUser, items, generatedAssets, onNavigate 
         <button className="profile-empty" onClick={() => onNavigate("capture")}>
           还没有生成成果
         </button>
+      )}
+
+      {showSettings && (
+        <div className="profile-settings-layer" role="presentation" onClick={() => setShowSettings(false)}>
+          <section className="profile-settings-sheet" role="dialog" aria-modal="true" aria-label="设置" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-grabber" />
+            <div className="sheet-heading">
+              <div>
+                <h2>设置</h2>
+                <p>{sessionUser?.isGuest ? "当前为游客身份" : "账号与本机状态"}</p>
+              </div>
+              <button className="sheet-close" type="button" onClick={() => setShowSettings(false)} aria-label="关闭设置">
+                ×
+              </button>
+            </div>
+
+            <button
+              className="profile-settings-row danger"
+              type="button"
+              onClick={() => {
+                setShowSettings(false);
+                onLogout();
+              }}
+            >
+              <span>退出登录</span>
+              <small>返回欢迎页</small>
+            </button>
+          </section>
+        </div>
       )}
     </div>
   );

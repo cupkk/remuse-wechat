@@ -6,6 +6,9 @@ import type { GenerationKind } from "../types.js";
 
 export const aiRouter = Router();
 
+const analyzeFailureMessage = "这次没有识别成功，可以保留故事再试一次。";
+const generateFailureMessage = "这次没有生成成功，可以保留故事再试一次。";
+
 const analysisSchema = z.object({
   itemName: z.string().max(80).optional(),
   category: z.string().max(40).optional(),
@@ -34,7 +37,10 @@ aiRouter.post("/analyze-item", async (req, res) => {
   try {
     res.json({ ok: true, data: await analyzeItem(parsed.data) });
   } catch (error) {
-    res.status(502).json({ ok: false, error: error instanceof Error ? error.message : "分析暂时失败，请稍后再试。" });
+    console.error("ai.analyze.failed", {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    res.status(502).json({ ok: false, error: analyzeFailureMessage });
   }
 });
 
@@ -64,7 +70,11 @@ function generateHandler(kind: GenerationKind) {
       });
       res.status(201).json({ ok: true, data: asset });
     } catch (error) {
-      res.status(502).json({ ok: false, error: error instanceof Error ? error.message : "生成暂时失败，请稍后再试。" });
+      console.error("ai.generate.failed", {
+        kind,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      res.status(502).json({ ok: false, error: generateFailureMessage });
     }
   };
 }

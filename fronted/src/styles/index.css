@@ -33,6 +33,7 @@
     --radius-lg: 24px;
     --radius-xl: 32px;
     
+    --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
 
@@ -5427,21 +5428,29 @@ button, input {
 }
 
 .square-view {
-  padding: 30px 18px calc(var(--nav-height) + 28px);
-  gap: 14px;
+  padding: max(38px, calc(var(--safe-area-top) + 28px)) 18px calc(var(--nav-height) + 28px);
+  gap: 18px;
 }
 
 .square-header {
   padding: 0;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 16px;
 }
 
 .square-header h1 {
   font-size: 36px;
   letter-spacing: 0;
+  line-height: 1.06;
+  margin-bottom: 8px;
+}
+
+.square-header p {
+  line-height: 1.4;
+  max-width: 220px;
 }
 
 .square-camera-btn {
@@ -5469,10 +5478,86 @@ button, input {
 .square-tabs {
   width: fit-content;
   padding: 4px;
-  margin: 0 0 4px;
+  margin: 2px 0 12px;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(18px);
+}
+
+.profile-settings-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #edf3df;
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: blur(18px);
+  flex: 0 0 auto;
+}
+
+.profile-settings-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.profile-settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0,0,0,0.38);
+  backdrop-filter: blur(12px);
+}
+
+.profile-settings-sheet {
+  width: min(100%, var(--max-width));
+  padding: 10px 20px calc(20px + var(--safe-area-bottom));
+  border-radius: 34px 34px 0 0;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(25, 27, 23, 0.86);
+  backdrop-filter: blur(34px) saturate(160%);
+  box-shadow: 0 -28px 70px rgba(0,0,0,0.36);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: sheetUp 0.28s ease-out;
+}
+
+.profile-settings-row {
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f5f7ee;
+  background: rgba(255,255,255,0.06);
+  text-align: left;
+}
+
+.profile-settings-row span {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.profile-settings-row small {
+  color: rgba(246,249,237,0.52);
+  font-size: 12px;
+}
+
+.profile-settings-row.danger span {
+  color: #ffb2a8;
 }
 
 .square-featured {

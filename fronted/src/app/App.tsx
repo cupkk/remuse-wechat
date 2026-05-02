@@ -93,6 +93,20 @@ export default function App() {
     setSelectedWork(null);
   };
 
+  const handleLogout = () => {
+    window.localStorage.removeItem("remuse_token");
+    setSessionUser(null);
+    setItems([]);
+    setGeneratedAssets([]);
+    setCurrentItem(null);
+    setCurrentAnalysis(null);
+    setGeneratedAsset(null);
+    setGenerationError("");
+    setSelectedWork(null);
+    setShowMood(false);
+    setActiveScreen("welcome");
+  };
+
   const handleSelectWork = (work: Work) => {
     const matchedItem = items.find((item) => item.id === work.id) ?? null;
     if (matchedItem) {
@@ -230,6 +244,7 @@ export default function App() {
               items={items}
               generatedAssets={generatedAssets}
               onNavigate={handleNavigate}
+              onLogout={handleLogout}
             />
           )}
         </main>

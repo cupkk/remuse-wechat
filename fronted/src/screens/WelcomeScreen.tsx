@@ -7,6 +7,17 @@ interface WelcomeScreenProps {
   onSessionReady: (user: AppSessionUser) => void;
 }
 
+function getBeijingDateLabel() {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${month} / ${day}`;
+}
+
 export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showAuthSheet, setShowAuthSheet] = useState(false);
@@ -14,6 +25,7 @@ export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps
   const [password, setPassword] = useState("");
   const [statusText, setStatusText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const beijingDateLabel = getBeijingDateLabel();
 
   const handleAccountSubmit = async () => {
     setIsSubmitting(true);
@@ -62,7 +74,7 @@ export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps
 
       <section className="welcome-object">
         <div className="welcome-object-card">
-          <div className="welcome-object-mark">05 / 24</div>
+          <div className="welcome-object-mark">{beijingDateLabel}</div>
           <div className="welcome-object-title">今日幸运好物</div>
           <div className="welcome-object-line" />
           <p>一件旧物，一段故事，一个新的去处。</p>
