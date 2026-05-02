@@ -1,54 +1,66 @@
-import express from 'express'
-import cors from 'cors'
-import dotenv from 'dotenv'
-import path from 'path'
-import authRoutes from './routes/auth'
-import miniprogramRoutes from './routes/miniprogram'
-// 引入原有的路由
-import itemsRoutes from './routes/items'
-import hallsRoutes from './routes/halls'
-import stickersRoutes from './routes/stickers'
-import aiRoutes from './routes/ai'
+import fs from "node:fs";
+import path from "node:path";
+import cors from "cors";
+import express from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import { config } from "./config.js";
+import "./database.js";
+import { aiRouter } from "./routes/ai.js";
+import { authRouter } from "./routes/auth.js";
+import { generatedAssetsRouter } from "./routes/generatedAssets.js";
+import { itemsRouter } from "./routes/items.js";
+import { uploadsRouter } from "./routes/uploads.js";
 
-dotenv.config()
+export function createApp() {
+  const app = express();
+  app.disable("x-powered-by");
 
-const app = express()
-const PORT = process.env.PORT || 3001
+  app.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(express.json({ limit: "10mb" }));
+  app.use(rateLimit({ windowMs: 5 * 60 * 1000, limit: 240 }));
 
-// 中间件
-app.use(cors())
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+  app.get("/api/healthz", (_req, res) => {
+    res.json({
+      ok: true,
+      data: {
+        service: "remuse-mobile-backend",
+        timestamp: new Date().toISOString(),
+        liveAi: !config.disableLiveAi
+      }
+    });
+  });
 
-// 静态文件服务
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+  app.use("/api/auth", authRouter);
+  app.use("/api/items", itemsRouter);
+  app.use("/api/uploads", uploadsRouter);
+  app.use("/api/ai", aiRouter);
+  app.use("/api/generated-assets", generatedAssetsRouter);
 
-// 路由
-app.use('/api/auth', authRoutes)
-app.use('/api/miniprogram', miniprogramRoutes)
-// 原有路由保持不变
-app.use('/api/items', itemsRoutes)
-app.use('/api/halls', hallsRoutes)
-app.use('/api/stickers', stickersRoutes)
-app.use('/api/ai', aiRoutes)
+  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  app.use("/api/uploads", express.static(path.resolve(config.uploadsDir), { maxAge: "1d" }));
 
-// 健康检查
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
-})
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ ok: false, error: "未找到对应接口。" });
+  });
 
-// 错误处理中间件
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack)
-  res.status(500).json({ error: '服务器内部错误' })
-})
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (res.headersSent) return;
+    const message = error instanceof Error ? error.message : "服务器开小差了，请稍后再试。";
+    res.status(500).json({ ok: false, error: message });
+  });
 
-// 404处理
-app.use((req, res) => {
-  res.status(404).json({ error: '接口不存在' })
-})
+  return app;
+}
 
-app.listen(PORT, () => {
-  console.log(`🚀 小程序后端服务已启动，运行在端口 ${PORT}`)
-  console.log(`📦 接口地址: http://localhost:${PORT}/api`)
-})
+export function startServer() {
+  const app = createApp();
+  return app.listen(config.port, config.host, () => {
+    console.log(`Remuse mobile API listening at http://${config.host}:${config.port}`);
+  });
+}
+
+if (process.env.NODE_ENV !== "test") {
+  startServer();
+}
