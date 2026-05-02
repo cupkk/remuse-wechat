@@ -26,16 +26,16 @@ export function PostDetailScreen({ onNavigate }: PostDetailScreenProps) {
         <div className="sticker-placeholder">
           图片占位
           <br />
-          <span style={{ fontSize: "12px", opacity: 0.7, fontWeight: 400, marginTop: "4px" }}>演唱会票根贴纸</span>
+          <span style={{ fontSize: "12px", opacity: 0.7, fontWeight: 400, marginTop: "4px" }}>演唱会票根表情包</span>
         </div>
       </div>
 
       <div className="detail-text-content">
-        <h1 className="detail-title">一张票根做成了春天贴纸</h1>
+        <h1 className="detail-title">一张票根做成了春天表情包</h1>
         <p className="detail-meta">
           来自演唱会票根 · <span className="highlight">@旧物收藏家</span>
         </p>
-        <p className="detail-desc">这张票根是去年春天留下的，后来被做成了一张可以保存、也可以分享的记忆贴纸。</p>
+        <p className="detail-desc">这张票根是去年春天留下的，后来被做成了一组可以保存、也可以分享的记忆表情。</p>
       </div>
 
       <div className="detail-stats">

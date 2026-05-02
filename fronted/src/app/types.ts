@@ -83,6 +83,10 @@ export interface Work {
   description: string;
   moodText: string;
   colorHex: string;
+  category?: string;
+  story?: string;
+  biography?: string;
+  voiceText?: string;
   imageUrl?: string | null;
   isPlaceholder?: boolean;
 }

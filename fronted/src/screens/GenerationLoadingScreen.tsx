@@ -6,43 +6,101 @@ interface GenerationLoadingScreenProps {
   errorText: string;
   isGenerating: boolean;
   onNavigate: (screen: ScreenType) => void;
+  onRetry: (kind: GenerationKind) => void;
 }
 
 const loadingLabels: Record<GenerationKind, string> = {
-  sticker: "正在生成贴纸",
-  emoji: "正在整理表情包",
-  perler: "正在计算拼豆图纸",
-  guide: "正在写改造指南"
+  sticker: "表情包生成中",
+  emoji: "表情包生成中",
+  perler: "拼豆生成中",
+  guide: "改造生成中"
 };
 
-export function GenerationLoadingScreen({ kind, item, errorText, isGenerating, onNavigate }: GenerationLoadingScreenProps) {
+export function GenerationLoadingScreen({ kind, item, errorText, isGenerating, onNavigate, onRetry }: GenerationLoadingScreenProps) {
   const failed = Boolean(errorText) && !isGenerating;
 
   return (
-    <div className="generation-loading-view view-animate">
-      <div className="generation-loading-orbit" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
+    <div className={`generation-loading-view ${failed ? "is-failed" : "is-generating"} view-animate`}>
+      <div className="generation-field" aria-hidden="true" />
 
-      <button className="back-btn generation-loading-back" onClick={() => onNavigate("result")}>
+      <button className="back-btn generation-loading-back" onClick={() => onNavigate("capture")}>
         <svg viewBox="0 0 24 24">
           <polyline points="15 18 9 12 15 6" />
         </svg>
       </button>
 
-      <section className="generation-loading-center">
-        <div className="loading-object-chip">{item?.name || "夏天的奶茶袋"}</div>
-        <div className="loading-progress-wrap" aria-hidden="true">
-          <div className="loading-progress-bar" />
+      <section className="generation-loading-center" aria-live="polite">
+        <div className="generation-sensory" aria-hidden="true">
+          <div className="sensory-aura sensory-aura-one" />
+          <div className="sensory-aura sensory-aura-two" />
+          <div className="sensory-ring sensory-ring-one" />
+          <div className="sensory-ring sensory-ring-two" />
+          <div className="sensory-ring sensory-ring-three" />
+          <div className="sensory-scan" />
+          <div className="sensory-orb">
+            {item?.imageUrl ? <img src={item.imageUrl} alt="" /> : <GenerationGlyph kind={kind} />}
+          </div>
+          <div className="sensory-particles">
+            {Array.from({ length: 16 }).map((_, index) => (
+              <i key={index} />
+            ))}
+          </div>
         </div>
-        <h1>{failed ? "这次没有生成成功" : loadingLabels[kind]}</h1>
-        <p>{errorText || "保留轮廓和故事。"}</p>
-        <button className="welcome-main-btn" onClick={() => onNavigate("result")} disabled={isGenerating}>
-          {isGenerating ? "生成中..." : failed ? "保留故事再试一次" : "等待生成结果"}
-        </button>
+
+        {failed ? (
+          <div className="generation-loading-copy failed-copy">
+            <h1>未生成</h1>
+            <p>故事已保留</p>
+            <button className="generation-retry-btn" onClick={() => onRetry(kind)}>
+              再试一次
+            </button>
+          </div>
+        ) : (
+          <div className="generation-loading-copy">
+            <div className="generation-state-kicker">{loadingLabels[kind]}</div>
+            <div className="generation-mini-line" aria-hidden="true">
+              <span />
+            </div>
+          </div>
+        )}
       </section>
     </div>
+  );
+}
+
+function GenerationGlyph({ kind }: { kind: GenerationKind }) {
+  if (kind === "emoji") {
+    return (
+      <svg viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="22" />
+        <path d="M23 27h.1M41 27h.1M22 40c5.4 4.8 14.6 4.8 20 0" />
+      </svg>
+    );
+  }
+
+  if (kind === "perler") {
+    return (
+      <svg viewBox="0 0 64 64">
+        <circle cx="21" cy="21" r="7" />
+        <circle cx="43" cy="21" r="7" />
+        <circle cx="21" cy="43" r="7" />
+        <circle cx="43" cy="43" r="7" />
+      </svg>
+    );
+  }
+
+  if (kind === "guide") {
+    return (
+      <svg viewBox="0 0 64 64">
+        <path d="M20 14h24v36H20z" />
+        <path d="M26 24h12M26 32h12M26 40h8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 64 64">
+      <path d="M32 8l6.5 17.5L56 32l-17.5 6.5L32 56l-6.5-17.5L8 32l17.5-6.5L32 8z" />
+    </svg>
   );
 }

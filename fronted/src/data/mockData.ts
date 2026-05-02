@@ -11,7 +11,7 @@ export const galleryItems: GalleryItem[] = [
   {
     id: "2",
     name: "奶茶袋",
-    status: "已生成贴纸",
+    status: "已生成表情包",
     statusType: "sticker",
     bgColor: "linear-gradient(135deg, rgba(214,184,139,0.14), rgba(189,162,122,0.08))"
   },
@@ -48,8 +48,8 @@ export const galleryItems: GalleryItem[] = [
 export const squareItems: SquareItem[] = [
   {
     id: "1",
-    category: "贴纸",
-    title: "一张票根做成了春天贴纸",
+    category: "表情包",
+    title: "一张票根做成了春天表情包",
     likes: 128,
     bgColor: "linear-gradient(135deg, rgba(227,223,211,0.14), rgba(197,194,183,0.08))",
     aspectRatio: "1 / 1.15"
@@ -135,10 +135,10 @@ export const generatedAssets: Record<string, GeneratedAsset> = {
   sticker: {
     id: "asset-sticker",
     kind: "sticker",
-    title: "夏天的奶茶袋贴纸",
+    title: "夏天的奶茶袋表情包",
     subtitle: "保留纸袋的折痕和绿色标记",
-    description: "适合做成一组清爽的手账贴纸，主图保留原物轮廓，周围加入小气泡和日期。",
-    primaryAction: "保存贴纸",
+    description: "适合做成一组清爽的日常表情，主图保留原物轮廓，周围加入小气泡和日期。",
+    primaryAction: "保存表情包",
     secondaryAction: "换一版"
   },
   emoji: {

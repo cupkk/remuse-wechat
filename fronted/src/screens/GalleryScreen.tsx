@@ -14,13 +14,24 @@ export function GalleryScreen({ items, generatedAssets, onNavigate, onSelectWork
   const works = useMemo(() => {
     return items.map((item, index) => {
       const itemAssets = generatedAssets.filter((asset) => asset.itemId === item.id);
+      const analysis = parseItemAnalysis(item.analysisJson);
+      const recognition = analysis?.itemRecognition;
+      const features = recognition?.visualFeatures?.filter(Boolean).slice(0, 3) || [];
+      const biography =
+        analysis?.emotionalResponse ||
+        analysis?.storySummary ||
+        (features.length > 0 ? `${item.name}保留了${features.join("、")}。` : `${item.name}已经被收入展馆。`);
       return {
         id: item.id,
         title: item.name,
         date: formatDate(item.createdAt),
-        description: item.story || "这件旧物还没有补充故事。",
+        description: biography,
         moodText: itemAssets.length > 0 ? `${itemAssets.length} 个生成成果` : "还没有生成成果",
         colorHex: coverColors[index % coverColors.length],
+        category: recognition?.category || item.category,
+        story: item.story,
+        biography,
+        voiceText: item.story,
         imageUrl: item.imageUrl,
         isPlaceholder: !item.imageUrl
       };
@@ -50,7 +61,7 @@ export function GalleryScreen({ items, generatedAssets, onNavigate, onSelectWork
 
       <div className="gallery-sphere-stage">
         <VanillaSphereGallery works={works} onWorkClick={(work) => {
-          if (!work.isPlaceholder) onSelectWork(work);
+          onSelectWork(work);
         }} />
       </div>
 
@@ -59,6 +70,22 @@ export function GalleryScreen({ items, generatedAssets, onNavigate, onSelectWork
       </div>
     </div>
   );
+}
+
+function parseItemAnalysis(analysisJson?: string | null) {
+  if (!analysisJson) return null;
+  try {
+    return JSON.parse(analysisJson) as {
+      itemRecognition?: {
+        category?: string;
+        visualFeatures?: string[];
+      };
+      storySummary?: string;
+      emotionalResponse?: string;
+    };
+  } catch {
+    return null;
+  }
 }
 
 const coverColors = ["2e8b57", "4682b4", "20b2aa", "3cb371", "008080", "5f9ea0"];

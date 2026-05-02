@@ -8,14 +8,13 @@ interface ResultScreenProps {
 }
 
 const quickActions: Array<{ kind: GenerationKind; title: string; className: string }> = [
-  { kind: "sticker", title: "贴纸", className: "action-sticker" },
   { kind: "emoji", title: "表情包", className: "action-emoji" },
   { kind: "perler", title: "拼豆", className: "action-perler" },
   { kind: "guide", title: "改造", className: "action-guide" }
 ];
 
 const recommendationLabels: Record<GenerationKind, string> = {
-  sticker: "贴纸",
+  sticker: "表情包",
   emoji: "6 张表情包",
   perler: "拼豆图纸",
   guide: "改造指南"
@@ -27,7 +26,7 @@ export function ResultScreen({ currentItem, analysis, onNavigate, onStartGenerat
   const emotionalResponse = analysis?.emotionalResponse || "故事保存后，Remuse 会给出更具体的情绪回应。";
   const reason = analysis?.recommendationReason || "请先完成真实上传和分析，再选择生成方向。";
   const value = analysis?.rarityAndValue;
-  const primaryKind = analysis?.primaryRecommendation || "sticker";
+  const primaryKind = normalizeGenerationKind(analysis?.primaryRecommendation);
   const features = analysis?.itemRecognition.visualFeatures?.filter(Boolean).slice(0, 3) || [];
 
   return (
@@ -128,6 +127,11 @@ export function ResultScreen({ currentItem, analysis, onNavigate, onStartGenerat
       </div>
     </div>
   );
+}
+
+function normalizeGenerationKind(kind?: GenerationKind): GenerationKind {
+  if (kind === "guide" || kind === "perler" || kind === "emoji") return kind;
+  return "emoji";
 }
 
 function GenerationIcon({ kind }: { kind: GenerationKind }) {

@@ -54,6 +54,13 @@ export function HomeScreen({ featuredItem, isLoadingItems, sessionUser, onNaviga
       </section>
 
       <div className="home-actions-wrap">
+        <button className="home-upload-action" onClick={() => onNavigate("capture")}>
+          <svg viewBox="0 0 24 24">
+            <path d="M14.5 5h-5L7.7 8H5a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-6a3 3 0 0 0-3-3h-2.7L14.5 5z" />
+            <circle cx="12" cy="14" r="3.5" />
+          </svg>
+          拍照 / 上传
+        </button>
         <div className="actions-row">
           <button className="btn btn-primary" onClick={() => (hasItem ? setAccepted(true) : onNavigate("capture"))}>
             {hasItem ? (accepted ? "已收下" : "收下好运") : "上传旧物"}

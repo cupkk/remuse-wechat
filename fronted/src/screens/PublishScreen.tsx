@@ -22,11 +22,12 @@ export function PublishScreen({
   const payload = parsePayload(generatedAsset?.payloadJson);
   const previewUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : currentItem?.imageUrl || "";
   const title = generatedAsset?.title || currentItem?.name || "";
+  const kindLabel = getKindLabel(generatedAsset?.kind);
 
   return (
     <div className="publish-view view-animate">
       <div className="publish-top-bar">
-        <button className="back-btn" onClick={() => onNavigate("result")}>
+        <button className="back-btn" onClick={() => onNavigate("capture")}>
           <svg viewBox="0 0 24 24">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -39,6 +40,10 @@ export function PublishScreen({
 
       <div className="publish-preview-img">
         {previewUrl ? <img src={previewUrl} alt={title || "发布预览"} /> : <span>预览</span>}
+        <div className="publish-preview-meta">
+          <span>{kindLabel}</span>
+          <strong>{title || "旧物"}</strong>
+        </div>
       </div>
 
       <div className="form-group">
@@ -51,9 +56,8 @@ export function PublishScreen({
       <div className="form-group">
         <label className="form-label">标签</label>
         <div className="form-tags">
-          <button className="form-tag-btn active">贴纸</button>
-          <button className="form-tag-btn">卡片</button>
-          <button className="form-tag-btn">拼豆</button>
+          <button className="form-tag-btn active">{kindLabel}</button>
+          <button className="form-tag-btn">旧物</button>
           <button className="form-tag-btn">交换</button>
         </div>
       </div>
@@ -89,4 +93,10 @@ function parsePayload(payloadJson?: string) {
   } catch {
     return {};
   }
+}
+
+function getKindLabel(kind?: string) {
+  if (kind === "guide") return "改造";
+  if (kind === "perler") return "拼豆";
+  return "表情包";
 }

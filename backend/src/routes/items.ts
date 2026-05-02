@@ -14,6 +14,13 @@ const itemSchema = z.object({
   analysis: z.record(z.string(), z.unknown()).optional()
 });
 
+const updateItemSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  category: z.string().min(1).max(40).optional(),
+  story: z.string().max(2000).optional(),
+  analysis: z.record(z.string(), z.unknown()).optional()
+});
+
 itemsRouter.use(authMiddleware);
 
 itemsRouter.get("/", (req, res) => {
@@ -43,4 +50,36 @@ itemsRouter.post("/", (req, res) => {
 
   const row = db.prepare("SELECT * FROM items WHERE id = ?").get(id) as ItemRow;
   res.status(201).json({ ok: true, data: toItemRecord(row) });
+});
+
+itemsRouter.patch("/:id", (req, res) => {
+  const parsed = updateItemSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: "藏品信息不完整。" });
+    return;
+  }
+
+  const existing = db.prepare("SELECT * FROM items WHERE id = ? AND user_id = ?").get(req.params.id, req.userId!) as ItemRow | undefined;
+  if (!existing) {
+    res.status(404).json({ ok: false, error: "没有找到这件藏品。" });
+    return;
+  }
+
+  const nextName = parsed.data.name ?? existing.name;
+  const nextCategory = parsed.data.category ?? existing.category;
+  const nextStory = parsed.data.story ?? existing.story;
+  const nextAnalysis =
+    parsed.data.analysis !== undefined ? JSON.stringify(parsed.data.analysis) : existing.analysis_json;
+
+  db.prepare("UPDATE items SET name = ?, category = ?, story = ?, analysis_json = ? WHERE id = ? AND user_id = ?").run(
+    nextName,
+    nextCategory,
+    nextStory,
+    nextAnalysis,
+    req.params.id,
+    req.userId!
+  );
+
+  const row = db.prepare("SELECT * FROM items WHERE id = ?").get(req.params.id) as ItemRow;
+  res.json({ ok: true, data: toItemRecord(row) });
 });

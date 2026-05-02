@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   AppSessionUser,
   GeneratedAssetRecord,
@@ -32,7 +32,7 @@ export default function App() {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [plazaPosts, setPlazaPosts] = useState<PlazaPost[]>([]);
   const [isLoadingPlaza, setIsLoadingPlaza] = useState(false);
-  const [currentGenerationKind, setCurrentGenerationKind] = useState<GenerationKind>("sticker");
+  const [currentGenerationKind, setCurrentGenerationKind] = useState<GenerationKind>("emoji");
   const [currentItem, setCurrentItem] = useState<ItemRecord | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<ItemAnalysisResult | null>(null);
   const [generatedAsset, setGeneratedAsset] = useState<GeneratedAssetRecord | null>(null);
@@ -74,8 +74,13 @@ export default function App() {
       .finally(() => setIsLoadingPlaza(false));
   }, [activeScreen, plazaPosts.length]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  useLayoutEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) return;
+    scrollElement.scrollTop = 0;
+    window.requestAnimationFrame(() => {
+      scrollElement.scrollTop = 0;
+    });
   }, [activeScreen]);
 
   const getNavActiveTab = (): MainTab => {
@@ -89,30 +94,40 @@ export default function App() {
   };
 
   const handleSelectWork = (work: Work) => {
+    const matchedItem = items.find((item) => item.id === work.id) ?? null;
+    if (matchedItem) {
+      setCurrentItem(matchedItem);
+      setCurrentAnalysis(parseItemAnalysis(matchedItem.analysisJson));
+    }
     setSelectedWork(work);
     setShowMood(false);
   };
 
-  const handleStartGeneration = async (kind: GenerationKind) => {
-    if (!featuredItem) {
+  const handleStartGeneration = async (kind: GenerationKind, itemOverride?: ItemRecord | null) => {
+    const targetItem = itemOverride ?? currentItem ?? items[0] ?? null;
+    if (!targetItem) {
       setGenerationError("请先上传一件旧物，再选择生成方式。");
+      setSelectedWork(null);
       setActiveScreen("capture");
       return;
     }
 
+    setCurrentItem(targetItem);
+    setCurrentAnalysis(parseItemAnalysis(targetItem.analysisJson));
     setCurrentGenerationKind(kind);
     setGeneratedAsset(null);
     setGenerationError("");
     setIsGenerating(true);
+    setSelectedWork(null);
     setActiveScreen("generation-loading");
     let didGenerate = false;
 
     try {
-      const asset = await generateAssetForItem(kind, featuredItem);
+      const asset = await generateAssetForItem(kind, targetItem);
       didGenerate = true;
       setGeneratedAsset(asset);
       setGeneratedAssets((current) => [asset, ...current.filter((existing) => existing.id !== asset.id)]);
-      setItems((current) => [featuredItem, ...current.filter((item) => item.id !== featuredItem.id)]);
+      setItems((current) => [targetItem, ...current.filter((item) => item.id !== targetItem.id)]);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "这次没有生成成功，可以保留故事再试一次。");
     } finally {
@@ -128,6 +143,12 @@ export default function App() {
   const handleItemCreated = (item: ItemRecord, analysis: ItemAnalysisResult) => {
     setCurrentItem(item);
     setCurrentAnalysis(analysis);
+    setItems((current) => [item, ...current.filter((existing) => existing.id !== item.id)]);
+  };
+
+  const handleItemUpdated = (item: ItemRecord) => {
+    setCurrentItem(item);
+    setCurrentAnalysis(parseItemAnalysis(item.analysisJson));
     setItems((current) => [item, ...current.filter((existing) => existing.id !== item.id)]);
   };
 
@@ -152,7 +173,14 @@ export default function App() {
               onSelectWork={handleSelectWork}
             />
           )}
-          {activeScreen === "capture" && <CaptureScreen onNavigate={handleNavigate} onItemCreated={handleItemCreated} />}
+          {activeScreen === "capture" && (
+            <CaptureScreen
+              onNavigate={handleNavigate}
+              onItemCreated={handleItemCreated}
+              onItemUpdated={handleItemUpdated}
+              onStartGeneration={handleStartGeneration}
+            />
+          )}
           {activeScreen === "result" && (
             <ResultScreen
               currentItem={featuredItem}
@@ -168,6 +196,7 @@ export default function App() {
               errorText={generationError}
               isGenerating={isGenerating}
               onNavigate={handleNavigate}
+              onRetry={handleStartGeneration}
             />
           )}
           {activeScreen === "sticker-result" && (
@@ -210,7 +239,7 @@ export default function App() {
             selectedWork={selectedWork}
             showMood={showMood}
             onClose={() => setSelectedWork(null)}
-            onNavigate={handleNavigate}
+            onStartGeneration={(kind) => handleStartGeneration(kind, items.find((item) => item.id === selectedWork.id) ?? currentItem)}
             onToggleMood={() => setShowMood((current) => !current)}
           />
         )}
@@ -225,7 +254,7 @@ function getGenerationResultScreen(kind: GenerationKind): ScreenType {
   if (kind === "emoji") return "emoji-pack";
   if (kind === "perler") return "perler-pattern";
   if (kind === "guide") return "guide-result";
-  return "sticker-result";
+  return "emoji-pack";
 }
 
 function parseItemAnalysis(analysisJson?: string | null): ItemAnalysisResult | null {

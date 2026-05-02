@@ -8,7 +8,7 @@ interface GenerationResultScreenProps {
 }
 
 const kindLabels: Record<GenerationKind, string> = {
-  sticker: "专属贴纸",
+  sticker: "表情包",
   emoji: "表情包",
   perler: "拼豆图纸",
   guide: "改造指南"
@@ -24,7 +24,7 @@ export function GenerationResultScreen({ kind, item, generatedAsset, onNavigate 
     return (
       <div className={`generation-view generation-${kind} view-animate`}>
         <div className="generation-top">
-          <button className="back-btn" onClick={() => onNavigate("result")}>
+          <button className="back-btn" onClick={() => onNavigate("capture")}>
             <svg viewBox="0 0 24 24">
               <polyline points="15 18 9 12 15 6" />
             </svg>
@@ -36,7 +36,7 @@ export function GenerationResultScreen({ kind, item, generatedAsset, onNavigate 
         <section className="generation-failed">
           <h1>这次没有生成成功</h1>
           <p>可以保留故事，再试一次。</p>
-          <button className="welcome-main-btn" onClick={() => onNavigate("result")}>
+          <button className="welcome-main-btn" onClick={() => onNavigate("capture")}>
             返回
           </button>
         </section>
@@ -47,7 +47,7 @@ export function GenerationResultScreen({ kind, item, generatedAsset, onNavigate 
   return (
     <div className={`generation-view generation-${kind} view-animate`}>
       <div className="generation-top">
-        <button className="back-btn" onClick={() => onNavigate("result")}>
+        <button className="back-btn" onClick={() => onNavigate("capture")}>
           <svg viewBox="0 0 24 24">
             <polyline points="15 18 9 12 15 6" />
           </svg>

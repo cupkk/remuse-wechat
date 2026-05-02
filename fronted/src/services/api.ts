@@ -88,6 +88,21 @@ export function createItem(input: {
   });
 }
 
+export function updateItem(
+  itemId: string,
+  input: Partial<{
+    name: string;
+    category: string;
+    story: string;
+    analysis: ItemAnalysisResult;
+  }>
+) {
+  return apiRequest<ItemRecord>(`/items/${encodeURIComponent(itemId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input)
+  });
+}
+
 export function uploadImage(file: File) {
   const formData = new FormData();
   formData.append("image", file);

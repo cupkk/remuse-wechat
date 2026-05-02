@@ -7,8 +7,10 @@ interface PlazaScreenProps {
 }
 
 export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) {
-  const leftColItems = posts.filter((_, index) => index % 2 === 0);
-  const rightColItems = posts.filter((_, index) => index % 2 !== 0);
+  const heroPost = posts[0] ?? null;
+  const gridPosts = posts.slice(1);
+  const leftColItems = gridPosts.filter((_, index) => index % 2 === 0);
+  const rightColItems = gridPosts.filter((_, index) => index % 2 !== 0);
 
   const renderCard = (item: PlazaPost) => (
     <button className="square-card" key={item.id} onClick={() => onNavigate("post-detail")}>
@@ -31,15 +33,35 @@ export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) 
   return (
     <div className="square-view view-animate">
       <header className="square-header">
-        <h1>广场</h1>
-        <p>{isLoading ? "读取中" : "官方精选"}</p>
+        <div>
+          <h1>广场</h1>
+          <p>{isLoading ? "读取中" : "官方精选"}</p>
+        </div>
+        <button className="square-camera-btn" onClick={() => onNavigate("capture")} aria-label="上传旧物">
+          <svg viewBox="0 0 24 24">
+            <path d="M14.5 5h-5L7.7 8H5a3 3 0 0 0-3 3v6a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-6a3 3 0 0 0-3-3h-2.7L14.5 5z" />
+            <circle cx="12" cy="14" r="3.5" />
+          </svg>
+        </button>
       </header>
 
       <div className="square-tabs">
         <button className="square-tab active">推荐</button>
-        <button className="square-tab">贴纸</button>
+        <button className="square-tab">表情包</button>
         <button className="square-tab">拼豆</button>
       </div>
+
+      {heroPost && (
+        <button className="square-featured" onClick={() => onNavigate("post-detail")}>
+          <div className="square-featured-img" style={{ background: heroPost.bgColor }}>
+            {heroPost.imageUrl ? <img src={heroPost.imageUrl} alt={heroPost.title} /> : <span>{heroPost.category}</span>}
+          </div>
+          <div className="square-featured-copy">
+            <span>{heroPost.category}</span>
+            <strong>{heroPost.title}</strong>
+          </div>
+        </button>
+      )}
 
       {posts.length > 0 ? (
         <div className="square-grid">

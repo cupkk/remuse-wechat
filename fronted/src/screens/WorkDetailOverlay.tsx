@@ -1,17 +1,28 @@
 import { Icons } from "../components/Icons";
-import type { ScreenType, Work } from "../app/types";
+import type { GenerationKind, Work } from "../app/types";
 
 interface WorkDetailOverlayProps {
   selectedWork: Work;
   showMood: boolean;
   onClose: () => void;
-  onNavigate: (screen: ScreenType) => void;
+  onStartGeneration: (kind: GenerationKind) => void;
   onToggleMood: () => void;
 }
 
-export function WorkDetailOverlay({ selectedWork, showMood, onClose, onNavigate, onToggleMood }: WorkDetailOverlayProps) {
+export function WorkDetailOverlay({
+  selectedWork,
+  showMood,
+  onClose,
+  onStartGeneration,
+  onToggleMood
+}: WorkDetailOverlayProps) {
+  const hasImage = Boolean(selectedWork.imageUrl);
+  const story = selectedWork.story?.trim() || "故事还在路上。";
+  const biography = selectedWork.biography?.trim() || selectedWork.description || "这件旧物已经被收入展馆。";
+  const voiceText = selectedWork.voiceText?.trim() || selectedWork.story?.trim() || "";
+
   return (
-    <div className="video-detail-overlay overlay-animate">
+    <div className={`video-detail-overlay vd-archive-detail ${selectedWork.isPlaceholder ? "is-placeholder" : ""} overlay-animate`}>
       <div className="vd-hero" style={{ backgroundColor: `#${selectedWork.colorHex}` }}>
         <div className="vd-top-controls">
           <button className="vd-icon-btn" onClick={onClose}>
@@ -21,11 +32,15 @@ export function WorkDetailOverlay({ selectedWork, showMood, onClose, onNavigate,
             <button className="vd-icon-btn">
               <Icons.Share />
             </button>
-            <button className="vd-icon-btn">
-              <Icons.Heart fill="#ff4b4b" />
-            </button>
           </div>
         </div>
+        {hasImage ? (
+          <img className="vd-hero-image" src={selectedWork.imageUrl || ""} alt={selectedWork.title} />
+        ) : (
+          <div className="vd-empty-card" aria-hidden="true">
+            <span />
+          </div>
+        )}
         <div className="vd-hero-gradient" />
       </div>
 
@@ -33,64 +48,62 @@ export function WorkDetailOverlay({ selectedWork, showMood, onClose, onNavigate,
         <div className="vd-header-row">
           <div>
             <h1 className="vd-title">{selectedWork.title}</h1>
-            <div className="vd-date">{selectedWork.date}</div>
-          </div>
-          <div className="vd-mem-id">MEM-ID#{selectedWork.id.toUpperCase()}</div>
-        </div>
-
-        <p className="vd-desc">{selectedWork.description}</p>
-
-        {!showMood ? (
-          <button className="vd-mood-section" onClick={onToggleMood}>
-            <span className="vd-mood-text">看看当时的心情</span>
-          </button>
-        ) : (
-          <div className="vd-mood-expanded" onClick={onToggleMood}>
-            <div className="vd-mood-header-expanded">
-              <span className="vd-mood-text">看看当时的心情</span>
-            </div>
-            <div className="vd-mood-quote">"{selectedWork.moodText}"</div>
-            <div className="vd-voice-memo">
-              <div className="vd-voice-icon">
-                <Icons.Message />
-              </div>
-              <div className="vd-voice-track">
-                <div className="vd-voice-bar">
-                  <div className="vd-voice-progress" />
-                </div>
-                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-mono)", marginTop: "8px" }}>
-                  VOICE_MEMO_01.MP3
-                </div>
-              </div>
+            <div className="vd-date">
+              {selectedWork.category || "旧物"} · {selectedWork.date || "空展位"}
             </div>
           </div>
-        )}
-
-        <div style={{ marginTop: "48px", textAlign: "center" }}>
-          <h3 style={{ fontSize: "18px", color: "#fff", fontWeight: 500, marginBottom: "6px" }}>让物品重获新生</h3>
-          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>选择一个方向开始创作</p>
         </div>
 
-        <div className="vd-actions-grid">
-          <button className="vd-action-btn" onClick={() => onNavigate("emoji-pack")}>
-            <div className="vd-action-icon">
+        <section className="vd-story-block">
+          <span>小传</span>
+          <p>{biography}</p>
+        </section>
+
+        <section className="vd-story-block vd-user-story">
+          <span>故事</span>
+          <p>{story}</p>
+        </section>
+
+        {voiceText && (
+          <button className={`vd-voice-card ${showMood ? "is-open" : ""}`} onClick={onToggleMood}>
+            <div className="vd-voice-icon">
               <Icons.Message />
             </div>
-            <span className="vd-action-label">表情包</span>
-          </button>
-          <button className="vd-action-btn" onClick={() => onNavigate("perler-pattern")}>
-            <div className="vd-action-icon">
-              <Icons.Pen />
+            <div className="vd-voice-track">
+              <div className="vd-voice-row">
+                <strong>语音记录</strong>
+                <span>{showMood ? "收起" : "转写"}</span>
+              </div>
+              <div className="vd-voice-bar">
+                <div className="vd-voice-progress" />
+              </div>
+              {showMood && <p>{voiceText}</p>}
             </div>
-            <span className="vd-action-label">拼豆图纸</span>
           </button>
-          <button className="vd-action-btn" onClick={() => onNavigate("guide-result")}>
-            <div className="vd-action-icon">
-              <Icons.Bulb />
-            </div>
-            <span className="vd-action-label">改造指南</span>
-          </button>
-        </div>
+        )}
+
+        {!selectedWork.isPlaceholder && (
+          <div className="vd-actions-grid">
+            <button className="vd-action-btn" onClick={() => onStartGeneration("emoji")}>
+              <div className="vd-action-icon">
+                <Icons.Message />
+              </div>
+              <span className="vd-action-label">表情包</span>
+            </button>
+            <button className="vd-action-btn" onClick={() => onStartGeneration("guide")}>
+              <div className="vd-action-icon">
+                <Icons.Bulb />
+              </div>
+              <span className="vd-action-label">改造</span>
+            </button>
+            <button className="vd-action-btn" onClick={() => onStartGeneration("perler")}>
+              <div className="vd-action-icon">
+                <Icons.Pen />
+              </div>
+              <span className="vd-action-label">拼豆</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

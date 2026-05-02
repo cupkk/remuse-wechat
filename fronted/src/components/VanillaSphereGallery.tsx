@@ -11,7 +11,7 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current || works.length === 0) return;
+    if (!containerRef.current) return;
 
     const container = containerRef.current;
     const scene = new THREE.Scene();
@@ -75,6 +75,12 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
       const intersects = raycaster.intersectObjects(group.children);
       if (intersects.length > 0) {
         onWorkClick(intersects[0].object.userData.item as Work);
+        return;
+      }
+
+      const firstRealWork = works.find((work) => !work.isPlaceholder);
+      if (firstRealWork) {
+        onWorkClick(firstRealWork);
       }
     };
 

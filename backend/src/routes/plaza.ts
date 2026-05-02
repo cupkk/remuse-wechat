@@ -5,19 +5,19 @@ export const plazaRouter = Router();
 
 const officialPosts: PlazaPostRecord[] = [
   {
-    id: "official-ticket-sticker",
-    category: "贴纸",
-    title: "一张票根做成了春天贴纸",
+    id: "official-ticket-emoji",
+    category: "表情包",
+    title: "一张票根变成春天表情包",
     author: "Remuse 官方",
     likes: 128,
     imageUrl: null,
     bgColor: "linear-gradient(135deg, rgba(227,223,211,0.14), rgba(197,194,183,0.08))",
     aspectRatio: "1 / 1.15",
-    description: "把演唱会票根整理成一张可以保存、也可以分享的记忆贴纸。"
+    description: "把演唱会票根整理成一组可以保存、也可以分享的记忆表情。"
   },
   {
-    id: "official-bottle-card",
-    category: "卡片",
+    id: "official-bottle-guide",
+    category: "改造",
     title: "空瓶也有自己的旅行坐标",
     author: "Remuse 官方",
     likes: 96,

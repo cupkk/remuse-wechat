@@ -8,7 +8,7 @@ interface ProfileScreenProps {
 }
 
 const kindLabel: Record<string, string> = {
-  sticker: "贴纸",
+  sticker: "成果",
   emoji: "表情包",
   perler: "拼豆",
   guide: "改造"
