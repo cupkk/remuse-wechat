@@ -1,10 +1,71 @@
-import type { ScreenType } from "../app/types";
+import { useMemo, useState } from "react";
+import type { ItemAnalysisResult, ItemRecord, ScreenType } from "../app/types";
+import { analyzeUploadedItem, createItem, uploadImage } from "../services/api";
 
 interface CaptureScreenProps {
   onNavigate: (screen: ScreenType) => void;
+  onItemCreated: (item: ItemRecord, analysis: ItemAnalysisResult) => void;
 }
 
-export function CaptureScreen({ onNavigate }: CaptureScreenProps) {
+const defaultStory = "";
+
+export function CaptureScreen({ onNavigate, onItemCreated }: CaptureScreenProps) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [itemName, setItemName] = useState("");
+  const [category, setCategory] = useState("");
+  const [story, setStory] = useState(defaultStory);
+  const [statusText, setStatusText] = useState("上传图片，写几句故事。");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const canAnalyze = selectedFile && story.trim().length > 0 && !isSubmitting;
+  const primaryStatus = useMemo(() => {
+    if (isSubmitting) return statusText;
+    if (selectedFile) return "图片已选择。";
+    return statusText;
+  }, [isSubmitting, selectedFile, statusText]);
+
+  const handleFileChange = (file?: File) => {
+    if (!file) return;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setStatusText("图片已选择。");
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) {
+      setStatusText("请先选择一张旧物图片。");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      setStatusText("保存图片...");
+      const uploaded = await uploadImage(selectedFile);
+      setStatusText("分析图片和故事...");
+      const analysis = await analyzeUploadedItem({
+        itemName: itemName.trim() || undefined,
+        category: category.trim() || undefined,
+        story: story.trim(),
+        imageUrl: uploaded.url
+      });
+      setStatusText("保存到展馆...");
+      const item = await createItem({
+        name: analysis.itemRecognition.name || itemName.trim() || "旧物",
+        category: analysis.itemRecognition.category || category.trim() || "记忆物品",
+        story: story.trim(),
+        imageUrl: uploaded.url,
+        analysis
+      });
+      onItemCreated(item, analysis);
+      onNavigate("result");
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : "这次没有分析成功，可以保留故事再试一次。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="capture-detail-view view-animate">
       <div className="capture-top-bar">
@@ -15,84 +76,47 @@ export function CaptureScreen({ onNavigate }: CaptureScreenProps) {
         </button>
         <div className="titles">
           <h1>拍下旧物</h1>
-          <p>说说它为什么值得留下</p>
+          <p>照片和故事就够了</p>
         </div>
-        <div className="capture-controls">
-          <svg viewBox="0 0 24 24">
-            <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-            <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
-          </svg>
-          <div className="control-div" />
-          <svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-            <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-          </svg>
-        </div>
+        <div className="capture-top-spacer" />
       </div>
 
       <div className="photo-preview-container">
-        <div className="photo-preview-placeholder">
-          <div>旧奶茶袋照片</div>
-          <div style={{ fontSize: "12px", marginTop: "6px", opacity: 0.6, fontWeight: 400 }}>真实 DOM 模拟层</div>
-        </div>
+        <label className={`photo-preview-placeholder capture-upload-drop ${previewUrl ? "has-image" : ""}`}>
+          {previewUrl ? (
+            <img src={previewUrl} alt="已选择的旧物" />
+          ) : (
+            <>
+              <div>选择照片</div>
+            </>
+          )}
+          <input type="file" accept="image/*" capture="environment" onChange={(event) => handleFileChange(event.target.files?.[0])} />
+        </label>
       </div>
 
       <div className="recognition-info">
         <h3>
-          识别为：<span>奶茶袋</span>
+          AI 分析 <span>{itemName || "待开始"}</span>
         </h3>
-        <p>愿意说说它的故事吗？</p>
-      </div>
-
-      <hr className="divider" />
-
-      <div className="voice-input-area">
-        <div className="mic-btn-wrapper">
-          <div className="mic-ripple mic-ripple-2" />
-          <div className="mic-ripple mic-ripple-1" />
-          <button className="mic-btn">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
-          </button>
-        </div>
-        <p>按住说话</p>
-      </div>
-
-      <div className="suggestion-chips">
-        <button className="chip">
-          <svg viewBox="0 0 24 24">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          它属于谁？
-        </button>
-        <button className="chip">
-          <svg viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          什么时候得到的？
-        </button>
+        <p>{primaryStatus}</p>
       </div>
 
       <div className="draft-card-container">
-        <div className="draft-header">故事草稿</div>
-        <div className="draft-content">去年夏天，和朋友刚考完试后买的那杯奶茶，留下的是终于能松一口气的感觉。</div>
+        <div className="draft-header">旧物故事</div>
+        <div className="capture-fields">
+          <input placeholder="名称，可留空" value={itemName} onChange={(event) => setItemName(event.target.value)} />
+          <input placeholder="分类，可留空" value={category} onChange={(event) => setCategory(event.target.value)} />
+          <textarea placeholder="写下它从哪里来，为什么留下。" value={story} onChange={(event) => setStory(event.target.value)} rows={4} />
+        </div>
         <div className="draft-actions">
-          <button className="draft-btn draft-btn-edit">
+          <button className="draft-btn draft-btn-edit" onClick={() => setStory("")} disabled={isSubmitting}>
             <svg viewBox="0 0 24 24">
               <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
             </svg>
-            修改
+            清空
           </button>
-          <button className="draft-btn draft-btn-continue" onClick={() => onNavigate("result")}>
-            继续分析
+          <button className="draft-btn draft-btn-continue" onClick={handleAnalyze} disabled={!canAnalyze}>
+            {isSubmitting ? "分析中..." : "分析"}
           </button>
         </div>
       </div>

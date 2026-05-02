@@ -11,12 +11,12 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || works.length === 0) return;
 
     const container = containerRef.current;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.z = 9.5;
+    camera.position.z = 10.5;
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -30,6 +30,8 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
     const phi = Math.PI * (3 - Math.sqrt(5));
     const meshes: THREE.Mesh[] = [];
     const fallbackColors = ["#39ff14", "#1b5e20", "#1e3a8a", "#0d9488", "#312e81", "#059669", "#2563eb", "#10b981"];
+    const textureLoader = new THREE.TextureLoader();
+    const textures: THREE.Texture[] = [];
 
     for (let i = 0; i < count; i += 1) {
       const y = 1 - (i / Math.max(count - 1, 1)) * 2;
@@ -37,18 +39,13 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
       const theta = phi * i;
       const x = Math.cos(theta) * radius;
       const z = Math.sin(theta) * radius;
-      const workItem = works[i % works.length];
+      const workItem = works[i] ?? createEmptySlot(i);
 
-      const geometry = new THREE.PlaneGeometry(1.2, 1.4);
-      const material = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(workItem.colorHex ? `#${workItem.colorHex}` : fallbackColors[i % fallbackColors.length]),
-        transparent: true,
-        opacity: 0.85,
-        side: THREE.DoubleSide
-      });
+      const geometry = new THREE.PlaneGeometry(0.92, 1.18);
+      const material = createCardMaterial(workItem, fallbackColors[i % fallbackColors.length], textureLoader, textures);
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(x * 4.2, y * 4.2, z * 4.2);
+      mesh.position.set(x * 3.55, y * 3.55 - 0.24, z * 3.55);
       mesh.lookAt(0, 0, 0);
       mesh.userData = {
         item: workItem,
@@ -185,6 +182,7 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
           mesh.material.dispose();
         }
       });
+      textures.forEach((texture) => texture.dispose());
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
@@ -193,4 +191,47 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
   }, [works, onWorkClick]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
+}
+
+function createCardMaterial(
+  workItem: Work,
+  fallbackColor: string,
+  textureLoader: THREE.TextureLoader,
+  textures: THREE.Texture[]
+) {
+  const baseOptions = {
+    transparent: true,
+    opacity: workItem.isPlaceholder ? 0.46 : 0.9,
+    side: THREE.DoubleSide
+  };
+
+  if (!workItem.isPlaceholder && workItem.imageUrl) {
+    const texture = textureLoader.load(workItem.imageUrl);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    textures.push(texture);
+    return new THREE.MeshBasicMaterial({
+      ...baseOptions,
+      map: texture,
+      color: new THREE.Color("#ffffff")
+    });
+  }
+
+  return new THREE.MeshBasicMaterial({
+    ...baseOptions,
+    color: new THREE.Color(workItem.colorHex ? `#${workItem.colorHex}` : fallbackColor)
+  });
+}
+
+function createEmptySlot(index: number): Work {
+  return {
+    id: `empty-slot-${index}`,
+    title: "空展位",
+    date: "",
+    description: "",
+    moodText: "",
+    colorHex: ["16271f", "1d3428", "26371f", "12302c"][index % 4],
+    imageUrl: null,
+    isPlaceholder: true
+  };
 }

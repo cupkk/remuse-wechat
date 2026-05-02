@@ -27,3 +27,33 @@ export interface GeneratedAssetRecord {
   payloadJson: string;
   createdAt: string;
 }
+
+export interface ItemAnalysisResult {
+  itemRecognition: {
+    name: string;
+    category: string;
+    visualFeatures: string[];
+  };
+  storySummary: string;
+  emotionalResponse: string;
+  primaryRecommendation: GenerationKind;
+  alternativeRecommendations: GenerationKind[];
+  recommendationReason: string;
+  rarityAndValue: {
+    rarity: "普通" | "少见" | "稀有" | "极稀有";
+    referenceValue: string;
+    note: string;
+  };
+}
+
+export interface PlazaPostRecord {
+  id: string;
+  category: string;
+  title: string;
+  author: string;
+  likes: number;
+  imageUrl: string | null;
+  bgColor: string;
+  aspectRatio: string;
+  description: string;
+}

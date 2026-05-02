@@ -1,8 +1,10 @@
-import type { ScreenType } from "../app/types";
+import type { GeneratedAssetRecord, ItemRecord, ScreenType } from "../app/types";
 
 interface PublishScreenProps {
   allowExchange: boolean;
   allowSameStyle: boolean;
+  currentItem: ItemRecord | null;
+  generatedAsset: GeneratedAssetRecord | null;
   onNavigate: (screen: ScreenType) => void;
   onToggleExchange: () => void;
   onToggleSameStyle: () => void;
@@ -11,10 +13,16 @@ interface PublishScreenProps {
 export function PublishScreen({
   allowExchange,
   allowSameStyle,
+  currentItem,
+  generatedAsset,
   onNavigate,
   onToggleExchange,
   onToggleSameStyle
 }: PublishScreenProps) {
+  const payload = parsePayload(generatedAsset?.payloadJson);
+  const previewUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : currentItem?.imageUrl || "";
+  const title = generatedAsset?.title || currentItem?.name || "";
+
   return (
     <div className="publish-view view-animate">
       <div className="publish-top-bar">
@@ -25,38 +33,18 @@ export function PublishScreen({
         </button>
         <div className="titles">
           <h1>发布作品</h1>
-          <p>把这件旧物的新生命放进广场</p>
         </div>
-        <div className="capture-controls">
-          <svg viewBox="0 0 24 24">
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-          </svg>
-          <div className="control-div" />
-          <svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-            <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-          </svg>
-        </div>
+        <div className="capture-top-spacer" />
       </div>
 
       <div className="publish-preview-img">
-        <div className="nayuki-sticker">
-          <div className="nayuki-logo">
-            夏日
-            <br />
-            小坐标
-          </div>
-          <div className="nayuki-text">REMUSE</div>
-        </div>
+        {previewUrl ? <img src={previewUrl} alt={title || "发布预览"} /> : <span>预览</span>}
       </div>
 
       <div className="form-group">
         <label className="form-label">标题</label>
         <div className="form-input-container">
-          <input type="text" className="form-input" placeholder="输入标题..." defaultValue="一只奶茶袋留下的夏天" />
-          <span className="form-char-count">11/30</span>
+          <input type="text" className="form-input" placeholder="输入标题" defaultValue={title} />
         </div>
       </div>
 
@@ -89,8 +77,16 @@ export function PublishScreen({
         <button className="btn-publish" onClick={() => onNavigate("square")}>
           发布
         </button>
-        <button className="btn-save-draft">存草稿</button>
       </div>
     </div>
   );
+}
+
+function parsePayload(payloadJson?: string) {
+  if (!payloadJson) return {} as Record<string, unknown>;
+  try {
+    return JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }

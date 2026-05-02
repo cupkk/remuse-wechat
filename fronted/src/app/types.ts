@@ -8,6 +8,7 @@ export type ScreenType =
   | "result"
   | "post-detail"
   | "publish"
+  | "generation-loading"
   | "sticker-result"
   | "emoji-pack"
   | "perler-pattern"
@@ -25,6 +26,35 @@ export interface GalleryItem {
   bgColor: string;
 }
 
+export interface ItemRecord {
+  id: string;
+  userId: string;
+  name: string;
+  category: string;
+  story: string;
+  imageUrl: string | null;
+  analysisJson: string | null;
+  createdAt: string;
+}
+
+export interface ItemAnalysisResult {
+  itemRecognition: {
+    name: string;
+    category: string;
+    visualFeatures: string[];
+  };
+  storySummary: string;
+  emotionalResponse: string;
+  primaryRecommendation: GenerationKind;
+  alternativeRecommendations: GenerationKind[];
+  recommendationReason: string;
+  rarityAndValue: {
+    rarity: "普通" | "少见" | "稀有" | "极稀有";
+    referenceValue: string;
+    note: string;
+  };
+}
+
 export interface SquareItem {
   id: string;
   category: string;
@@ -34,6 +64,18 @@ export interface SquareItem {
   aspectRatio: string;
 }
 
+export interface PlazaPost {
+  id: string;
+  category: string;
+  title: string;
+  author: string;
+  likes: number;
+  imageUrl: string | null;
+  bgColor: string;
+  aspectRatio: string;
+  description: string;
+}
+
 export interface Work {
   id: string;
   title: string;
@@ -41,6 +83,8 @@ export interface Work {
   description: string;
   moodText: string;
   colorHex: string;
+  imageUrl?: string | null;
+  isPlaceholder?: boolean;
 }
 
 export interface UserSession {
@@ -60,4 +104,21 @@ export interface GeneratedAsset {
   description: string;
   primaryAction: string;
   secondaryAction: string;
+}
+
+export interface GeneratedAssetRecord {
+  id: string;
+  userId: string;
+  itemId: string | null;
+  kind: GenerationKind;
+  title: string;
+  payloadJson: string;
+  createdAt: string;
+}
+
+export interface AppSessionUser {
+  id: string;
+  email?: string | null;
+  nickname: string;
+  isGuest: boolean;
 }

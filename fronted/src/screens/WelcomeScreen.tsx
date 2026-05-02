@@ -1,13 +1,15 @@
 import { useState } from "react";
-import type { ScreenType } from "../app/types";
+import type { AppSessionUser, ScreenType } from "../app/types";
 import { enterAsGuest, login, register } from "../services/api";
 
 interface WelcomeScreenProps {
   onNavigate: (screen: ScreenType) => void;
+  onSessionReady: (user: AppSessionUser) => void;
 }
 
-export function WelcomeScreen({ onNavigate }: WelcomeScreenProps) {
+export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [showAuthSheet, setShowAuthSheet] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [statusText, setStatusText] = useState("");
@@ -19,6 +21,7 @@ export function WelcomeScreen({ onNavigate }: WelcomeScreenProps) {
     try {
       const session = mode === "login" ? await login(email, password) : await register(email, password);
       window.localStorage.setItem("remuse_token", session.token);
+      onSessionReady(session.user);
       onNavigate("home");
     } catch (error) {
       setStatusText(error instanceof Error ? error.message : "暂时无法进入，请稍后再试。");
@@ -33,8 +36,10 @@ export function WelcomeScreen({ onNavigate }: WelcomeScreenProps) {
     try {
       const session = await enterAsGuest();
       window.localStorage.setItem("remuse_token", session.token);
+      onSessionReady(session.user);
     } catch {
       window.localStorage.setItem("remuse_token", "local-preview-token");
+      onSessionReady({ id: "local-preview", nickname: "游客身份", isGuest: true });
     } finally {
       setIsSubmitting(false);
       onNavigate("home");
@@ -52,7 +57,7 @@ export function WelcomeScreen({ onNavigate }: WelcomeScreenProps) {
       <header className="welcome-brand">
         <span>remuse</span>
         <h1>把旧物交给一座会记得的博物馆</h1>
-        <p>先以游客身份体验，之后再保存账号。</p>
+        <p>先用游客身份体验，再决定要不要保存账号。</p>
       </header>
 
       <section className="welcome-object">
@@ -64,39 +69,61 @@ export function WelcomeScreen({ onNavigate }: WelcomeScreenProps) {
         </div>
       </section>
 
-      <section className="welcome-auth">
-        <div className="welcome-auth-tabs">
-          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>
-            登录
-          </button>
-          <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>
-            注册
-          </button>
-        </div>
-
-        <label>
-          <span>手机号 / 邮箱</span>
-          <input placeholder="输入账号" value={email} onChange={(event) => setEmail(event.target.value)} />
-        </label>
-        <label>
-          <span>密码</span>
-          <input
-            type="password"
-            placeholder={mode === "login" ? "输入密码" : "设置密码"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-
-        {statusText && <p className="welcome-status">{statusText}</p>}
-
-        <button className="welcome-main-btn" onClick={handleAccountSubmit} disabled={isSubmitting}>
-          {isSubmitting ? "处理中..." : mode === "login" ? "进入 Remuse" : "创建账号"}
+      <section className="welcome-entry">
+        <button className="welcome-guest-primary" onClick={handleGuest} disabled={isSubmitting}>
+          <span>{isSubmitting ? "正在进入..." : "游客体验"}</span>
+          <small>无需注册，先完成一次旧物再生</small>
         </button>
-        <button className="welcome-guest-btn" onClick={handleGuest} disabled={isSubmitting}>
-          {isSubmitting ? "正在进入..." : "游客身份进入"}
+        <button className="welcome-auth-link" onClick={() => setShowAuthSheet(true)} disabled={isSubmitting}>
+          登录 / 注册账号
         </button>
       </section>
+
+      {showAuthSheet && (
+        <div className="welcome-sheet-layer" role="presentation" onClick={() => setShowAuthSheet(false)}>
+          <section className="welcome-auth-sheet" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-grabber" />
+            <div className="sheet-heading">
+              <div>
+                <h2>{mode === "login" ? "登录账号" : "创建账号"}</h2>
+                <p>账号只用于同步你的藏品和生成成果。</p>
+              </div>
+              <button className="sheet-close" onClick={() => setShowAuthSheet(false)} aria-label="关闭登录面板">
+                ×
+              </button>
+            </div>
+
+            <div className="welcome-auth-tabs">
+              <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>
+                登录
+              </button>
+              <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>
+                注册
+              </button>
+            </div>
+
+            <label>
+              <span>邮箱</span>
+              <input placeholder="输入邮箱" value={email} onChange={(event) => setEmail(event.target.value)} />
+            </label>
+            <label>
+              <span>密码</span>
+              <input
+                type="password"
+                placeholder={mode === "login" ? "输入密码" : "设置至少 6 位密码"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+
+            {statusText && <p className="welcome-status">{statusText}</p>}
+
+            <button className="welcome-main-btn" onClick={handleAccountSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "处理中..." : mode === "login" ? "进入 Remuse" : "创建账号"}
+            </button>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

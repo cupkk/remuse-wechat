@@ -8,6 +8,7 @@ export const aiRouter = Router();
 
 const analysisSchema = z.object({
   itemName: z.string().max(80).optional(),
+  category: z.string().max(40).optional(),
   story: z.string().max(2000).optional(),
   imageUrl: z.string().optional()
 });
@@ -15,6 +16,9 @@ const analysisSchema = z.object({
 const generateSchema = z.object({
   itemId: z.string().optional(),
   itemName: z.string().max(80).optional(),
+  category: z.string().max(40).optional(),
+  imageUrl: z.string().nullable().optional(),
+  analysis: z.record(z.string(), z.unknown()).nullable().optional(),
   story: z.string().max(2000).optional()
 });
 
@@ -52,6 +56,9 @@ function generateHandler(kind: GenerationKind) {
         userId: req.userId!,
         itemId: parsed.data.itemId,
         itemName: parsed.data.itemName,
+        category: parsed.data.category,
+        imageUrl: parsed.data.imageUrl,
+        analysis: parsed.data.analysis || null,
         story: parsed.data.story,
         kind
       });

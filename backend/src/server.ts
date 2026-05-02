@@ -10,6 +10,7 @@ import { aiRouter } from "./routes/ai.js";
 import { authRouter } from "./routes/auth.js";
 import { generatedAssetsRouter } from "./routes/generatedAssets.js";
 import { itemsRouter } from "./routes/items.js";
+import { plazaRouter } from "./routes/plaza.js";
 import { uploadsRouter } from "./routes/uploads.js";
 
 export function createApp() {
@@ -37,6 +38,7 @@ export function createApp() {
   app.use("/api/uploads", uploadsRouter);
   app.use("/api/ai", aiRouter);
   app.use("/api/generated-assets", generatedAssetsRouter);
+  app.use("/api/plaza", plazaRouter);
 
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   app.use("/api/uploads", express.static(path.resolve(config.uploadsDir), { maxAge: "1d" }));

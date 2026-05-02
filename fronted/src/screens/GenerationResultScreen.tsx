@@ -1,8 +1,9 @@
-import { generatedAssets } from "../data/mockData";
-import type { GenerationKind, ScreenType } from "../app/types";
+import type { GeneratedAssetRecord, GenerationKind, ItemRecord, ScreenType } from "../app/types";
 
 interface GenerationResultScreenProps {
   kind: GenerationKind;
+  item: ItemRecord | null;
+  generatedAsset: GeneratedAssetRecord | null;
   onNavigate: (screen: ScreenType) => void;
 }
 
@@ -13,8 +14,35 @@ const kindLabels: Record<GenerationKind, string> = {
   guide: "改造指南"
 };
 
-export function GenerationResultScreen({ kind, onNavigate }: GenerationResultScreenProps) {
-  const asset = generatedAssets[kind];
+export function GenerationResultScreen({ kind, item, generatedAsset, onNavigate }: GenerationResultScreenProps) {
+  const generatedPayload = parsePayload(generatedAsset?.payloadJson);
+  const imageUrl = typeof generatedPayload.imageUrl === "string" ? generatedPayload.imageUrl : null;
+  const generatedTitle = generatedAsset?.title || kindLabels[kind];
+  const generatedSubtitle = getPayloadString(generatedPayload, "kindLabel") || kindLabels[kind];
+
+  if (!generatedAsset || !imageUrl) {
+    return (
+      <div className={`generation-view generation-${kind} view-animate`}>
+        <div className="generation-top">
+          <button className="back-btn" onClick={() => onNavigate("result")}>
+            <svg viewBox="0 0 24 24">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <span>{kindLabels[kind]}</span>
+          <div />
+        </div>
+
+        <section className="generation-failed">
+          <h1>这次没有生成成功</h1>
+          <p>可以保留故事，再试一次。</p>
+          <button className="welcome-main-btn" onClick={() => onNavigate("result")}>
+            返回
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className={`generation-view generation-${kind} view-animate`}>
@@ -25,103 +53,43 @@ export function GenerationResultScreen({ kind, onNavigate }: GenerationResultScr
           </svg>
         </button>
         <span>{kindLabels[kind]}</span>
-        <button className="generation-more-btn">
-          <svg viewBox="0 0 24 24">
-            <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
+        <div />
       </div>
 
       <section className="generation-hero">
         <div className="generation-art">
-          {kind === "sticker" && <StickerPreview />}
-          {kind === "emoji" && <EmojiPreview />}
-          {kind === "perler" && <PerlerPreview />}
-          {kind === "guide" && <GuidePreview />}
+          <img className="generated-real-image" src={imageUrl} alt={generatedTitle} />
         </div>
       </section>
 
       <section className="generation-copy">
-        <p className="generation-kicker">{asset.subtitle}</p>
-        <h1>{asset.title}</h1>
-        <p>{asset.description}</p>
-      </section>
-
-      <section className="generation-meta">
-        <div>
-          <span>来源</span>
-          <strong>夏天的奶茶袋</strong>
-        </div>
-        <div>
-          <span>状态</span>
-          <strong>已生成</strong>
-        </div>
+        <p className="generation-kicker">{generatedSubtitle}</p>
+        <h1>{generatedTitle}</h1>
+        <p>{item?.name || "已保存到展馆"}</p>
       </section>
 
       <div className="generation-actions">
         <button className="action-btn btn-outline" onClick={() => onNavigate("gallery")}>
-          保存到展馆
+          展馆
         </button>
         <button className="action-btn btn-solid" onClick={() => onNavigate("publish")}>
-          发布到广场
+          发布
         </button>
       </div>
     </div>
   );
 }
 
-function StickerPreview() {
-  return (
-    <div className="sticker-preview">
-      <div className="sticker-paper">
-        <span>SUMMER</span>
-        <strong>松一口气</strong>
-      </div>
-      <div className="sticker-dot dot-a" />
-      <div className="sticker-dot dot-b" />
-    </div>
-  );
+function parsePayload(payloadJson?: string) {
+  if (!payloadJson) return {} as Record<string, unknown>;
+  try {
+    return JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
-function EmojiPreview() {
-  return (
-    <div className="emoji-preview">
-      {["松", "好", "再", "收"].map((text) => (
-        <div className="emoji-cell" key={text}>
-          {text}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PerlerPreview() {
-  return (
-    <div className="perler-preview">
-      {Array.from({ length: 100 }).map((_, index) => (
-        <span className={`bead bead-${index % 5}`} key={index} />
-      ))}
-    </div>
-  );
-}
-
-function GuidePreview() {
-  return (
-    <div className="guide-preview">
-      <div className="guide-step">
-        <span>01</span>
-        <strong>裁下正面图案</strong>
-      </div>
-      <div className="guide-step">
-        <span>02</span>
-        <strong>写入故事摘要</strong>
-      </div>
-      <div className="guide-step">
-        <span>03</span>
-        <strong>装入透明封套</strong>
-      </div>
-    </div>
-  );
+function getPayloadString(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : "";
 }
