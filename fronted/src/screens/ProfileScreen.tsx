@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AppSessionUser, GeneratedAssetRecord, ItemRecord, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface ProfileScreenProps {
   sessionUser: AppSessionUser | null;
@@ -76,7 +77,7 @@ export function ProfileScreen({ sessionUser, items, generatedAssets, onNavigate,
         <div className="profile-gallery">
           {recentAssets.map((asset) => {
             const payload = parsePayload(asset.payloadJson);
-            const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : "";
+            const imageUrl = resolveMediaUrl(typeof payload.imageUrl === "string" ? payload.imageUrl : "");
             return (
               <div className="profile-card" key={asset.id}>
                 {imageUrl ? <img src={imageUrl} alt={asset.title} /> : <span>{kindLabel[asset.kind] || "成果"}</span>}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { Work } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface VanillaSphereGalleryProps {
   works: Work[];
@@ -26,27 +27,24 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
     const group = new THREE.Group();
     scene.add(group);
 
-    const count = 24;
-    const phi = Math.PI * (3 - Math.sqrt(5));
-    const meshes: THREE.Mesh[] = [];
-    const fallbackColors = ["#39ff14", "#1b5e20", "#1e3a8a", "#0d9488", "#312e81", "#059669", "#2563eb", "#10b981"];
+    const hasWorks = works.length > 0;
+    const visibleWorks = hasWorks ? works : Array.from({ length: 12 }, (_, index) => createEmptySlot(index));
+    const fallbackColors = ["#bff35f", "#8de0ff", "#f2d36b", "#a9f0c4", "#d8b4fe", "#84f2e1", "#f7a8a8", "#e7f8b6"];
     const textureLoader = new THREE.TextureLoader();
     const textures: THREE.Texture[] = [];
+    const meshes: THREE.Mesh[] = [];
+    const isSingleWork = hasWorks && visibleWorks.length === 1;
 
-    for (let i = 0; i < count; i += 1) {
-      const y = 1 - (i / Math.max(count - 1, 1)) * 2;
-      const radius = Math.sqrt(1 - y * y);
-      const theta = phi * i;
-      const x = Math.cos(theta) * radius;
-      const z = Math.sin(theta) * radius;
-      const workItem = works[i] ?? createEmptySlot(i);
-
-      const geometry = new THREE.PlaneGeometry(0.92, 1.18);
-      const material = createCardMaterial(workItem, fallbackColors[i % fallbackColors.length], textureLoader, textures);
-
+    visibleWorks.forEach((workItem, index) => {
+      const geometry = new THREE.PlaneGeometry(isSingleWork ? 1.58 : 0.92, isSingleWork ? 2.02 : 1.18);
+      const material = createCardMaterial(workItem, fallbackColors[index % fallbackColors.length], textureLoader, textures);
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(x * 3.55, y * 3.55 - 0.24, z * 3.55);
-      mesh.lookAt(0, 0, 0);
+      const position = getCardPosition(index, visibleWorks.length, hasWorks);
+
+      mesh.position.copy(position);
+      if (!isSingleWork && position.lengthSq() > 0.001) {
+        mesh.lookAt(0, 0, 0);
+      }
       mesh.userData = {
         item: workItem,
         floatOffset: Math.random() * Math.PI * 2,
@@ -55,7 +53,7 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
 
       group.add(mesh);
       meshes.push(mesh);
-    }
+    });
 
     let isDragging = false;
     let startMousePosition = { clientX: 0, clientY: 0 };
@@ -143,8 +141,8 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
       const time = clock.getElapsedTime();
 
       if (!isDragging) {
-        group.rotation.y += 0.002;
-        group.rotation.x += 0.0005;
+        group.rotation.y += isSingleWork ? 0 : 0.002;
+        group.rotation.x += isSingleWork ? 0 : 0.0005;
       }
 
       meshes.forEach((mesh) => {
@@ -152,7 +150,12 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
         const floatOffset = mesh.userData.floatOffset as number;
         mesh.position.y = basePosition.y + Math.sin(time * 2 + floatOffset) * 0.1;
         mesh.position.x = basePosition.x + Math.cos(time * 1.5 + floatOffset) * 0.1;
-        mesh.lookAt(0, 0, 0);
+        if (isSingleWork) {
+          mesh.rotation.x = Math.sin(time * 0.8) * 0.035;
+          mesh.rotation.y = Math.sin(time * 0.65) * 0.12;
+        } else if (mesh.position.lengthSq() > 0.001) {
+          mesh.lookAt(0, 0, 0);
+        }
       });
 
       renderer.render(scene, camera);
@@ -199,6 +202,27 @@ export function VanillaSphereGallery({ works, onWorkClick }: VanillaSphereGaller
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }
 
+function getCardPosition(index: number, count: number, hasWorks: boolean) {
+  if (hasWorks && count === 1) {
+    return new THREE.Vector3(0, -0.16, 0);
+  }
+
+  if (hasWorks && count <= 5) {
+    const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+    return new THREE.Vector3(Math.cos(angle) * 2.45, Math.sin(angle) * 1.4 - 0.2, Math.sin(angle) * 1.3);
+  }
+
+  const phi = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - (index / Math.max(count - 1, 1)) * 2;
+  const radius = Math.sqrt(1 - y * y);
+  const theta = phi * index;
+  const x = Math.cos(theta) * radius;
+  const z = Math.sin(theta) * radius;
+  const spread = hasWorks ? 3.28 : 3.55;
+
+  return new THREE.Vector3(x * spread, y * spread - 0.24, z * spread);
+}
+
 function createCardMaterial(
   workItem: Work,
   fallbackColor: string,
@@ -207,12 +231,13 @@ function createCardMaterial(
 ) {
   const baseOptions = {
     transparent: true,
-    opacity: workItem.isPlaceholder ? 0.46 : 0.9,
+    opacity: workItem.isPlaceholder ? 0.72 : 0.98,
     side: THREE.DoubleSide
   };
 
-  if (!workItem.isPlaceholder && workItem.imageUrl) {
-    const texture = textureLoader.load(workItem.imageUrl);
+  const textureUrl = resolveMediaUrl(workItem.imageUrl);
+  if (!workItem.isPlaceholder && textureUrl) {
+    const texture = textureLoader.load(textureUrl);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4;
     textures.push(texture);
@@ -236,7 +261,7 @@ function createEmptySlot(index: number): Work {
     date: "",
     description: "",
     moodText: "",
-    colorHex: ["16271f", "1d3428", "26371f", "12302c"][index % 4],
+    colorHex: ["c8f06b", "8edbff", "e8d47b", "a7efc4"][index % 4],
     imageUrl: null,
     isPlaceholder: true
   };

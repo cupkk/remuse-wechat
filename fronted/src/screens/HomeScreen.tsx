@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AppSessionUser, ItemRecord, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface HomeScreenProps {
   featuredItem: ItemRecord | null;
@@ -11,6 +12,7 @@ interface HomeScreenProps {
 export function HomeScreen({ featuredItem, isLoadingItems, sessionUser, onNavigate }: HomeScreenProps) {
   const [accepted, setAccepted] = useState(false);
   const hasItem = Boolean(featuredItem);
+  const featuredImageUrl = resolveMediaUrl(featuredItem?.coverImageUrl || featuredItem?.imageUrl);
 
   return (
     <div className={`home-view view-animate ${accepted ? "fortune-accepted" : ""}`}>
@@ -33,7 +35,7 @@ export function HomeScreen({ featuredItem, isLoadingItems, sessionUser, onNaviga
         {hasItem ? (
           <>
             <div className="main-image">
-              {featuredItem?.imageUrl ? <img src={featuredItem.imageUrl} alt={featuredItem.name} /> : <span>{featuredItem?.category || "旧物"}</span>}
+              {featuredImageUrl ? <img src={featuredImageUrl} alt={featuredItem?.name || "旧物"} /> : <span>{featuredItem?.category || "旧物"}</span>}
               <span style={{ fontSize: "11px", marginTop: "6px", opacity: 0.8 }}>{featuredItem?.name}</span>
             </div>
             <div className="pedestal" />

@@ -1,4 +1,5 @@
 import type { GeneratedAssetRecord, GenerationKind, ItemRecord, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface GenerationResultScreenProps {
   kind: GenerationKind;
@@ -16,7 +17,7 @@ const kindLabels: Record<GenerationKind, string> = {
 
 export function GenerationResultScreen({ kind, item, generatedAsset, onNavigate }: GenerationResultScreenProps) {
   const generatedPayload = parsePayload(generatedAsset?.payloadJson);
-  const imageUrl = typeof generatedPayload.imageUrl === "string" ? generatedPayload.imageUrl : null;
+  const imageUrl = resolveMediaUrl(typeof generatedPayload.imageUrl === "string" ? generatedPayload.imageUrl : null);
   const generatedTitle = generatedAsset?.title || kindLabels[kind];
   const generatedSubtitle = getPayloadString(generatedPayload, "kindLabel") || kindLabels[kind];
 

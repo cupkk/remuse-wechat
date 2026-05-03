@@ -43,18 +43,17 @@ export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps
   };
 
   const handleGuest = async () => {
-    setIsSubmitting(true);
     setStatusText("");
+    window.localStorage.setItem("remuse_token", "local-preview-token");
+    onSessionReady({ id: "local-preview", nickname: "游客身份", isGuest: true });
+    onNavigate("home");
+
     try {
       const session = await enterAsGuest();
       window.localStorage.setItem("remuse_token", session.token);
       onSessionReady(session.user);
     } catch {
-      window.localStorage.setItem("remuse_token", "local-preview-token");
-      onSessionReady({ id: "local-preview", nickname: "游客身份", isGuest: true });
-    } finally {
-      setIsSubmitting(false);
-      onNavigate("home");
+      // Keep the instant local guest session. The next authenticated API call retries guest creation.
     }
   };
 
@@ -68,23 +67,22 @@ export function WelcomeScreen({ onNavigate, onSessionReady }: WelcomeScreenProps
 
       <header className="welcome-brand">
         <span>remuse</span>
-        <h1>把旧物交给一座会记得的博物馆</h1>
-        <p>先用游客身份体验，再决定要不要保存账号。</p>
+        <h1>把旧物交给一座有记忆的博物馆</h1>
       </header>
 
       <section className="welcome-object">
         <div className="welcome-object-card">
+          <div className="welcome-object-glint" aria-hidden="true" />
           <div className="welcome-object-mark">{beijingDateLabel}</div>
           <div className="welcome-object-title">今日幸运好物</div>
           <div className="welcome-object-line" />
-          <p>一件旧物，一段故事，一个新的去处。</p>
+          <p>一件旧物，一个新去处。</p>
         </div>
       </section>
 
       <section className="welcome-entry">
         <button className="welcome-guest-primary" onClick={handleGuest} disabled={isSubmitting}>
-          <span>{isSubmitting ? "正在进入..." : "游客体验"}</span>
-          <small>无需注册，先完成一次旧物再生</small>
+          <span>游客体验</span>
         </button>
         <button className="welcome-auth-link" onClick={() => setShowAuthSheet(true)} disabled={isSubmitting}>
           登录 / 注册账号

@@ -1,9 +1,12 @@
 import type { GenerationKind, GeneratedAssetRecord, ItemAnalysisResult, ItemRecord, PlazaPost, UserSession } from "../app/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const LOCAL_PREVIEW_TOKEN = "local-preview-token";
+
+let guestSessionPromise: Promise<UserSession> | null = null;
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = window.localStorage.getItem("remuse_token");
+  const token = await getRequestToken(path);
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -15,14 +18,14 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload?.error || "请求没有成功，请稍后再试。");
+    throw new Error(toSafeApiError(payload?.error, "请求没有成功，请稍后再试。"));
   }
 
   return payload.data ?? payload;
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  const token = window.localStorage.getItem("remuse_token");
+  const token = await getRequestToken(path);
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: {
@@ -33,14 +36,25 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload?.error || "上传没有成功，请稍后再试。");
+    throw new Error(toSafeApiError(payload?.error, "上传没有成功，请再试一次。"));
   }
 
   return payload.data ?? payload;
 }
 
+export function resolveMediaUrl(url?: string | null) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (!url.startsWith("/api/")) return url;
+
+  if (API_BASE.startsWith("http")) {
+    return `${API_BASE.replace(/\/api\/?$/, "")}${url}`;
+  }
+  return url;
+}
+
 export function enterAsGuest() {
-  return apiRequest<UserSession>("/auth/guest", { method: "POST", body: JSON.stringify({}) });
+  return requestGuestSession();
 }
 
 export function register(email: string, password: string) {
@@ -121,12 +135,36 @@ export function analyzeUploadedItem(input: {
   });
 }
 
+export function transcribeStoryAudio(input: { audioBase64: string; mimeType: string }) {
+  return apiRequest<{ text: string }>("/ai/transcribe-story", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
 export function listGeneratedAssets() {
   return apiRequest<GeneratedAssetRecord[]>("/generated-assets");
 }
 
 export function listOfficialPlazaPosts() {
   return apiRequest<PlazaPost[]>("/plaza/official");
+}
+
+export function listPlazaPosts() {
+  return apiRequest<PlazaPost[]>("/plaza");
+}
+
+export function createPlazaPost(input: {
+  itemId: string;
+  generatedAssetId?: string | null;
+  title?: string;
+  allowSameStyle: boolean;
+  allowExchange: boolean;
+}) {
+  return apiRequest<PlazaPost>("/plaza", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export function generateAssetForItem(kind: GenerationKind, item?: ItemRecord | null) {
@@ -157,4 +195,46 @@ function parseAnalysis(analysisJson?: string | null) {
   } catch {
     return null;
   }
+}
+
+function toSafeApiError(error: unknown, fallback: string) {
+  if (typeof error !== "string" || !error.trim()) return fallback;
+  const message = error.trim();
+  if (message.includes("{") || message.includes("openai_error") || message.includes("\"message\"") || message.length > 100) {
+    return fallback;
+  }
+  return message;
+}
+
+function requestGuestSession() {
+  if (!guestSessionPromise) {
+    guestSessionPromise = fetch(`${API_BASE}/auth/guest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(toSafeApiError(payload?.error, "暂时无法进入，请稍后再试。"));
+        }
+        return (payload.data ?? payload) as UserSession;
+      })
+      .catch((error) => {
+        guestSessionPromise = null;
+        throw error;
+      });
+  }
+  return guestSessionPromise;
+}
+
+async function getRequestToken(path: string) {
+  const token = window.localStorage.getItem("remuse_token");
+  if (token !== LOCAL_PREVIEW_TOKEN || path.startsWith("/auth/")) {
+    return token;
+  }
+
+  const session = await requestGuestSession();
+  window.localStorage.setItem("remuse_token", session.token);
+  return session.token;
 }

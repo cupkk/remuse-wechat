@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.js";
-import { analyzeItem, generateAsset } from "../services/aiService.js";
+import { analyzeItem, generateAsset, transcribeStoryAudio } from "../services/aiService.js";
 import type { GenerationKind } from "../types.js";
 
 export const aiRouter = Router();
 
 const analyzeFailureMessage = "这次没有识别成功，可以保留故事再试一次。";
 const generateFailureMessage = "这次没有生成成功，可以保留故事再试一次。";
+const transcribeFailureMessage = "这次没有听清楚，可以直接输入故事。";
 
 const analysisSchema = z.object({
   itemName: z.string().max(80).optional(),
@@ -23,6 +24,11 @@ const generateSchema = z.object({
   imageUrl: z.string().nullable().optional(),
   analysis: z.record(z.string(), z.unknown()).nullable().optional(),
   story: z.string().max(2000).optional()
+});
+
+const transcribeSchema = z.object({
+  audioBase64: z.string().min(1),
+  mimeType: z.string().min(1).max(80)
 });
 
 aiRouter.use(authMiddleware);
@@ -48,6 +54,27 @@ aiRouter.post("/generate-sticker", generateHandler("sticker"));
 aiRouter.post("/generate-emoji-pack", generateHandler("emoji"));
 aiRouter.post("/generate-perler-pattern", generateHandler("perler"));
 aiRouter.post("/generate-transformation-guide", generateHandler("guide"));
+
+aiRouter.post("/transcribe-story", async (req, res) => {
+  const parsed = transcribeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: transcribeFailureMessage });
+    return;
+  }
+
+  try {
+    const text = await transcribeStoryAudio({
+      base64Audio: parsed.data.audioBase64,
+      mimeType: parsed.data.mimeType
+    });
+    res.json({ ok: true, data: { text } });
+  } catch (error) {
+    console.error("ai.transcribe.failed", {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    res.status(502).json({ ok: false, error: transcribeFailureMessage });
+  }
+});
 
 function generateHandler(kind: GenerationKind) {
   return async (req: import("express").Request, res: import("express").Response) => {

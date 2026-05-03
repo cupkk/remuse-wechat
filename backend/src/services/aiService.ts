@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
+import sharp from "sharp";
 import { config } from "../config.js";
 import { db, toGeneratedAssetRecord, type GeneratedAssetRow, type ItemRow } from "../database.js";
 import type { GeneratedAssetRecord, GenerationKind, ItemAnalysisResult } from "../types.js";
@@ -15,6 +16,15 @@ interface GenerateAssetInput {
   story?: string;
   imageUrl?: string | null;
   analysis?: Record<string, unknown> | null;
+}
+
+interface GenerateItemCoverInput {
+  userId: string;
+  itemId: string;
+  itemName?: string;
+  category?: string;
+  story?: string;
+  imageUrl?: string | null;
 }
 
 interface GeminiPart {
@@ -59,11 +69,26 @@ export async function analyzeItem(input: { itemName?: string; category?: string;
   const image = await loadUploadImage(input.imageUrl);
 
   if (!config.disableLiveAi && config.gemini.apiKey && image) {
-    return normalizeAnalysis(await callGeminiAnalysis(input, image));
+    try {
+      return normalizeAnalysis(await callGeminiAnalysis(input, image));
+    } catch (error) {
+      console.warn("ai.analysis.gemini_failed", {
+        model: config.gemini.analysisModel,
+        hasImage: true,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   if (!config.disableLiveAi && config.stepfun.apiKey) {
-    return normalizeAnalysis(await callStepfunJson(buildAnalysisPrompt(input, false)));
+    try {
+      return normalizeAnalysis(await callStepfunJson(buildAnalysisPrompt(input, false)));
+    } catch (error) {
+      console.warn("ai.analysis.stepfun_failed", {
+        model: config.stepfun.textModel,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   return buildLocalAnalysis(input);
@@ -81,6 +106,91 @@ export async function generateAsset(input: GenerateAssetInput): Promise<Generate
 
   const row = db.prepare("SELECT * FROM generated_assets WHERE id = ?").get(id) as GeneratedAssetRow;
   return toGeneratedAssetRecord(row);
+}
+
+export async function generateItemCover(input: GenerateItemCoverInput) {
+  if (config.disableLiveAi || !config.gemini.apiKey) {
+    throw new Error("cover_generation_unavailable");
+  }
+
+  const image = await loadUploadImage(input.imageUrl);
+  if (!image) {
+    throw new Error("cover_source_image_missing");
+  }
+
+  const response = await getGeminiClient().models.generateContent({
+    model: config.gemini.imageModel,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: buildItemCoverPrompt(input) },
+          { inlineData: image }
+        ]
+      }
+    ],
+    config: {
+      responseModalities: ["IMAGE"],
+      imageConfig: {
+        aspectRatio: "1:1",
+        imageSize: "1K"
+      }
+    }
+  });
+
+  const imagePart = findInlineImage(response as GeminiResponseShape);
+  if (!imagePart.inlineData?.data) {
+    throw new Error("cover_image_empty");
+  }
+
+  const preparedCover = await prepareStickerCoverImage(
+    imagePart.inlineData.data,
+    imagePart.inlineData.mimeType || "image/png"
+  );
+
+  return saveGeneratedImage(
+    input.userId,
+    preparedCover.base64Data,
+    preparedCover.mimeType,
+    "item-covers"
+  );
+}
+
+export async function transcribeStoryAudio(input: { base64Audio: string; mimeType: string }) {
+  if (config.disableLiveAi || !config.gemini.apiKey) {
+    throw new Error("speech_transcription_unavailable");
+  }
+
+  const response = await getGeminiClient().models.generateContent({
+    model: config.gemini.audioModel,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: [
+              "请把这段中文语音转写成用户与旧物之间的故事草稿。",
+              "只返回转写后的中文正文，不要加标题，不要解释，不要补写用户没有说的内容。",
+              "如果语音很短，也请保留原意。"
+            ].join("\n")
+          },
+          {
+            inlineData: {
+              data: input.base64Audio,
+              mimeType: input.mimeType
+            }
+          }
+        ]
+      }
+    ],
+    config: {
+      responseModalities: ["TEXT"]
+    }
+  });
+
+  const text = extractText(response as GeminiResponseShape).trim();
+  if (!text) throw new Error("speech_transcription_empty");
+  return text.slice(0, 2000);
 }
 
 function hydrateGenerateInput(input: GenerateAssetInput): GenerateAssetInput {
@@ -208,13 +318,24 @@ function findInlineImage(response: GeminiResponseShape): GeminiPart {
   return imagePart;
 }
 
-async function saveGeneratedImage(userId: string, base64Data: string, mimeType: string) {
+function extractText(response: GeminiResponseShape) {
+  return (
+    response.text ||
+    response.candidates
+      ?.flatMap((candidate) => candidate.content?.parts || [])
+      .map((part) => part.text || "")
+      .join("\n") ||
+    ""
+  );
+}
+
+async function saveGeneratedImage(userId: string, base64Data: string, mimeType: string, folder = "generated") {
   const extension = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : mimeType.includes("webp") ? "webp" : "png";
-  const userDir = path.join(config.uploadsDir, userId, "generated");
+  const userDir = path.join(config.uploadsDir, userId, folder);
   await fs.mkdir(userDir, { recursive: true });
   const fileName = `${randomUUID()}.${extension}`;
   await fs.writeFile(path.join(userDir, fileName), Buffer.from(base64Data, "base64"));
-  return `/api/uploads/${userId}/generated/${fileName}`;
+  return `/api/uploads/${userId}/${folder}/${fileName}`;
 }
 
 function buildImagePrompt(input: GenerateAssetInput) {
@@ -238,6 +359,160 @@ function buildImagePrompt(input: GenerateAssetInput) {
   };
 
   return [...shared, kindPrompt[input.kind]].join("\n");
+}
+
+function buildItemCoverPrompt(input: GenerateItemCoverInput) {
+  return [
+    "你是 Remuse 再生博物馆的藏品封面抠图助手。",
+    "请严格参考用户上传的真实旧物图片，把图片中的主体旧物处理成一张适合 3D 展馆卡片使用的贴纸式封面。",
+    "要求：只保留旧物主体，轮廓干净，边缘有轻微柔和白边或半透明高光；尽量使用透明背景 PNG，如果无法透明，则使用极简深色中性背景。",
+    "不要改变旧物的关键形状、颜色、磨损、贴纸、纹理和年代感。",
+    "不要添加文字、logo、UI 边框、二维码、说明标签，也不要生成多张拼图。",
+    "画面中心留出完整主体，适合方形卡片和移动端浏览。",
+    `物品：${input.itemName || "旧物"}`,
+    `分类：${input.category || "记忆物品"}`,
+    `用户故事：${input.story?.trim() || "用户还没有补充故事"}`
+  ].join("\n");
+}
+
+async function prepareStickerCoverImage(base64Data: string, mimeType: string) {
+  const source = Buffer.from(base64Data, "base64");
+  const image = sharp(source).rotate().resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true }).ensureAlpha();
+  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+  const output = Buffer.from(data);
+  const backgroundMask = floodFillBackgroundMask(data, info.width, info.height, info.channels);
+
+  let removedPixels = 0;
+  for (let index = 0; index < backgroundMask.length; index += 1) {
+    if (!backgroundMask[index]) continue;
+    const alphaOffset = index * info.channels + 3;
+    const currentAlpha = output[alphaOffset] ?? 255;
+    output[alphaOffset] = Math.min(currentAlpha, 0);
+    removedPixels += 1;
+  }
+
+  if (removedPixels < info.width * info.height * 0.02) {
+    return { base64Data, mimeType };
+  }
+
+  const pngBuffer = await sharp(output, {
+    raw: {
+      width: info.width,
+      height: info.height,
+      channels: info.channels
+    }
+  })
+    .png()
+    .toBuffer();
+
+  return {
+    base64Data: pngBuffer.toString("base64"),
+    mimeType: "image/png"
+  };
+}
+
+function floodFillBackgroundMask(data: Buffer, width: number, height: number, channels: number) {
+  const backgroundMask = new Uint8Array(width * height);
+  const visited = new Uint8Array(width * height);
+  const queue: number[] = [];
+  const cornerColors = sampleCornerColors(data, width, height, channels);
+  if (!cornerColors.length) return backgroundMask;
+
+  const colorDistance = (index: number) => {
+    const offset = index * channels;
+    const alpha = data[offset + 3] ?? 255;
+    if (alpha <= 8) return 0;
+
+    let best = Number.POSITIVE_INFINITY;
+    for (const color of cornerColors) {
+      const distance = Math.sqrt(
+        ((data[offset] || 0) - color.r) ** 2 +
+          ((data[offset + 1] || 0) - color.g) ** 2 +
+          ((data[offset + 2] || 0) - color.b) ** 2
+      );
+      best = Math.min(best, distance);
+    }
+    return best;
+  };
+
+  const tryEnqueue = (x: number, y: number) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    const pixelIndex = y * width + x;
+    if (visited[pixelIndex]) return;
+    visited[pixelIndex] = 1;
+    if (colorDistance(pixelIndex) <= 58) {
+      backgroundMask[pixelIndex] = 1;
+      queue.push(pixelIndex);
+    }
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    tryEnqueue(x, 0);
+    tryEnqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    tryEnqueue(0, y);
+    tryEnqueue(width - 1, y);
+  }
+
+  while (queue.length > 0) {
+    const pixelIndex = queue.pop()!;
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    tryEnqueue(x - 1, y);
+    tryEnqueue(x + 1, y);
+    tryEnqueue(x, y - 1);
+    tryEnqueue(x, y + 1);
+  }
+
+  return backgroundMask;
+}
+
+function sampleCornerColors(data: Buffer, width: number, height: number, channels: number) {
+  const sampleSize = Math.max(8, Math.min(24, Math.floor(Math.min(width, height) * 0.08)));
+  const regions = [
+    { startX: 0, startY: 0 },
+    { startX: width - sampleSize, startY: 0 },
+    { startX: 0, startY: height - sampleSize },
+    { startX: width - sampleSize, startY: height - sampleSize }
+  ];
+
+  return regions
+    .map((region) => averageRegionColor(data, width, height, channels, region.startX, region.startY, sampleSize))
+    .filter((color): color is { r: number; g: number; b: number } => Boolean(color));
+}
+
+function averageRegionColor(
+  data: Buffer,
+  width: number,
+  height: number,
+  channels: number,
+  startX: number,
+  startY: number,
+  sampleSize: number
+) {
+  let totalR = 0;
+  let totalG = 0;
+  let totalB = 0;
+  let count = 0;
+
+  for (let y = startY; y < Math.min(startY + sampleSize, height); y += 1) {
+    for (let x = startX; x < Math.min(startX + sampleSize, width); x += 1) {
+      const offset = (y * width + x) * channels;
+      if ((data[offset + 3] ?? 255) <= 8) continue;
+      totalR += data[offset] || 0;
+      totalG += data[offset + 1] || 0;
+      totalB += data[offset + 2] || 0;
+      count += 1;
+    }
+  }
+
+  if (count === 0) return null;
+  return {
+    r: Math.round(totalR / count),
+    g: Math.round(totalG / count),
+    b: Math.round(totalB / count)
+  };
 }
 
 async function callGeminiAnalysis(input: { itemName?: string; category?: string; story?: string; imageUrl?: string }, image: ImageInput) {
@@ -272,7 +547,7 @@ function buildAnalysisPrompt(input: { itemName?: string; category?: string; stor
   "itemRecognition": { "name": "物品名称", "category": "分类", "visualFeatures": ["外观特征"] },
   "storySummary": "一句话故事摘要",
   "emotionalResponse": "温柔但克制的情绪回应",
-  "primaryRecommendation": "sticker | emoji | perler | guide",
+  "primaryRecommendation": "emoji | perler | guide",
   "alternativeRecommendations": ["emoji", "perler"],
   "recommendationReason": "为什么推荐这样继续存在",
   "rarityAndValue": { "rarity": "普通 | 少见 | 稀有 | 极稀有", "referenceValue": "参考价值描述", "note": "收藏或流转建议" }
@@ -286,7 +561,7 @@ function buildAnalysisPrompt(input: { itemName?: string; category?: string; stor
 function normalizeAnalysis(raw: Record<string, unknown>): ItemAnalysisResult {
   const itemRecognition = asRecord(raw.itemRecognition);
   const rarityAndValue = asRecord(raw.rarityAndValue);
-  const primary = normalizeKind(raw.primaryRecommendation) || "sticker";
+  const primary = normalizeKind(raw.primaryRecommendation) || "emoji";
   const alternatives = Array.isArray(raw.alternativeRecommendations)
     ? raw.alternativeRecommendations.map(normalizeKind).filter((kind): kind is GenerationKind => Boolean(kind))
     : [];
@@ -321,8 +596,8 @@ function buildLocalAnalysis(input: { itemName?: string; category?: string; story
     },
     storySummary: input.story || "这件旧物还没有补充完整故事。",
     emotionalResponse: "故事已经被保留下来，等模型可用时可以继续生成更完整的回应。",
-    primaryRecommendation: "sticker",
-    alternativeRecommendations: ["emoji", "perler", "guide"],
+    primaryRecommendation: "emoji",
+    alternativeRecommendations: ["perler", "guide"],
     recommendationReason: "当前使用本地分析兜底；建议先保存故事，稍后再生成真实结果。",
     rarityAndValue: {
       rarity: "普通",

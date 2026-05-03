@@ -23,7 +23,7 @@ import { PublishScreen } from "../screens/PublishScreen";
 import { ResultScreen } from "../screens/ResultScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { WorkDetailOverlay } from "../screens/WorkDetailOverlay";
-import { generateAssetForItem, listGeneratedAssets, listItems, listOfficialPlazaPosts } from "../services/api";
+import { createPlazaPost, generateAssetForItem, listGeneratedAssets, listItems, listPlazaPosts } from "../services/api";
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenType>("welcome");
@@ -32,6 +32,7 @@ export default function App() {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [plazaPosts, setPlazaPosts] = useState<PlazaPost[]>([]);
   const [isLoadingPlaza, setIsLoadingPlaza] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<PlazaPost | null>(null);
   const [currentGenerationKind, setCurrentGenerationKind] = useState<GenerationKind>("emoji");
   const [currentItem, setCurrentItem] = useState<ItemRecord | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<ItemAnalysisResult | null>(null);
@@ -48,6 +49,10 @@ export default function App() {
   const mainTabs: MainTab[] = ["home", "gallery", "square", "profile"];
   const showBottomNav = mainTabs.includes(activeScreen as MainTab);
   const featuredItem = useMemo(() => currentItem ?? items[0] ?? null, [currentItem, items]);
+  const pendingCoverKey = useMemo(
+    () => items.filter((item) => item.imageUrl && !item.coverImageUrl).map((item) => item.id).join("|"),
+    [items]
+  );
 
   useEffect(() => {
     const token = window.localStorage.getItem("remuse_token");
@@ -68,11 +73,46 @@ export default function App() {
   useEffect(() => {
     if (activeScreen !== "square" || plazaPosts.length > 0) return;
     setIsLoadingPlaza(true);
-    listOfficialPlazaPosts()
+    listPlazaPosts()
       .then(setPlazaPosts)
       .catch(() => setPlazaPosts([]))
       .finally(() => setIsLoadingPlaza(false));
   }, [activeScreen, plazaPosts.length]);
+
+  useEffect(() => {
+    if (!sessionUser || !pendingCoverKey) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let timerId = 0;
+
+    const refreshItems = async () => {
+      attempts += 1;
+      try {
+        const nextItems = await listItems();
+        if (!cancelled) {
+          setItems(nextItems);
+          setCurrentItem((current) => {
+            if (!current) return nextItems[0] ?? null;
+            return nextItems.find((item) => item.id === current.id) ?? current;
+          });
+        }
+      } catch {
+        // Cover generation is a background enhancement; keep the archived item usable.
+      }
+
+      if (!cancelled && attempts < 6) {
+        timerId = window.setTimeout(refreshItems, 3500);
+      }
+    };
+
+    timerId = window.setTimeout(refreshItems, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [pendingCoverKey, sessionUser]);
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
@@ -91,6 +131,7 @@ export default function App() {
   const handleNavigate = (screen: ScreenType) => {
     setActiveScreen(screen);
     setSelectedWork(null);
+    if (screen !== "post-detail") setSelectedPost(null);
   };
 
   const handleLogout = () => {
@@ -103,6 +144,7 @@ export default function App() {
     setGeneratedAsset(null);
     setGenerationError("");
     setSelectedWork(null);
+    setSelectedPost(null);
     setShowMood(false);
     setActiveScreen("welcome");
   };
@@ -115,6 +157,33 @@ export default function App() {
     }
     setSelectedWork(work);
     setShowMood(false);
+  };
+
+  const handleSelectPost = (post: PlazaPost) => {
+    setSelectedPost(post);
+    setSelectedWork(null);
+    setActiveScreen("post-detail");
+  };
+
+  const refreshPlazaPosts = async () => {
+    const nextPosts = await listPlazaPosts();
+    setPlazaPosts(nextPosts);
+    return nextPosts;
+  };
+
+  const handlePublish = async (input: {
+    itemId: string;
+    generatedAssetId?: string | null;
+    title?: string;
+    allowSameStyle: boolean;
+    allowExchange: boolean;
+  }) => {
+    const post = await createPlazaPost(input);
+    setPlazaPosts((current) => [post, ...current.filter((item) => item.id !== post.id)]);
+    setSelectedPost(post);
+    setSelectedWork(null);
+    setActiveScreen("post-detail");
+    return post;
   };
 
   const handleStartGeneration = async (kind: GenerationKind, itemOverride?: ItemRecord | null) => {
@@ -225,15 +294,29 @@ export default function App() {
           {activeScreen === "guide-result" && (
             <GenerationResultScreen kind="guide" item={featuredItem} generatedAsset={generatedAsset} onNavigate={handleNavigate} />
           )}
-          {activeScreen === "square" && <PlazaScreen posts={plazaPosts} isLoading={isLoadingPlaza} onNavigate={handleNavigate} />}
-          {activeScreen === "post-detail" && <PostDetailScreen onNavigate={handleNavigate} />}
+          {activeScreen === "square" && (
+            <PlazaScreen
+              posts={plazaPosts}
+              isLoading={isLoadingPlaza}
+              onNavigate={handleNavigate}
+              onRefresh={refreshPlazaPosts}
+              onSelectPost={handleSelectPost}
+            />
+          )}
+          {activeScreen === "post-detail" && <PostDetailScreen post={selectedPost} onNavigate={handleNavigate} />}
           {activeScreen === "publish" && (
             <PublishScreen
               allowExchange={allowExchange}
               allowSameStyle={allowSameStyle}
-              currentItem={featuredItem}
+              items={items}
+              currentItem={currentItem}
               generatedAsset={generatedAsset}
+              onSelectItem={(item) => {
+                setCurrentItem(item);
+                setCurrentAnalysis(parseItemAnalysis(item.analysisJson));
+              }}
               onNavigate={handleNavigate}
+              onPublish={handlePublish}
               onToggleExchange={() => setAllowExchange((current) => !current)}
               onToggleSameStyle={() => setAllowSameStyle((current) => !current)}
             />
@@ -260,6 +343,14 @@ export default function App() {
         )}
 
         {showBottomNav && <BottomNav activeTab={getNavActiveTab()} onNavigate={handleNavigate} />}
+        {activeScreen === "square" && (
+          <button className="fab-btn app-fab-btn" onClick={() => handleNavigate("publish")} aria-label="发布作品">
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

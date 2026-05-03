@@ -16,6 +16,7 @@ import { uploadsRouter } from "./routes/uploads.js";
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
   app.use(cors({ origin: true, credentials: true }));
@@ -41,7 +42,15 @@ export function createApp() {
   app.use("/api/plaza", plazaRouter);
 
   fs.mkdirSync(config.uploadsDir, { recursive: true });
-  app.use("/api/uploads", express.static(path.resolve(config.uploadsDir), { maxAge: "1d" }));
+  app.use(
+    "/api/uploads",
+    express.static(path.resolve(config.uploadsDir), {
+      maxAge: "1d",
+      setHeaders: (res) => {
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      }
+    })
+  );
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ ok: false, error: "未找到对应接口。" });

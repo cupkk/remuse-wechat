@@ -16,18 +16,34 @@ async function main() {
   const item = await fetch(`${baseUrl}/api/items`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ name: "奶茶袋", category: "包装", story: "考完试后的那杯奶茶。" })
+    body: JSON.stringify({
+      name: "奶茶杯套",
+      category: "包装",
+      story: "考完试后的那杯奶茶。"
+    })
   });
   if (!item.ok) throw new Error("create item failed");
+  const itemPayload = await item.json() as { data: { id: string } };
 
-  const generated = await fetch(`${baseUrl}/api/ai/generate-sticker`, {
+  const items = await fetch(`${baseUrl}/api/items`, { headers });
+  if (!items.ok) throw new Error("list items failed");
+
+  const plaza = await fetch(`${baseUrl}/api/plaza`);
+  if (!plaza.ok) throw new Error("list plaza failed");
+
+  const publish = await fetch(`${baseUrl}/api/plaza`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ itemName: "奶茶袋", story: "考完试后的那杯奶茶。" })
+    body: JSON.stringify({
+      itemId: itemPayload.data.id,
+      title: "奶茶杯套",
+      allowSameStyle: true,
+      allowExchange: false
+    })
   });
-  if (!generated.ok) throw new Error("generate sticker failed");
+  if (!publish.ok) throw new Error("publish plaza post failed");
 
-  console.log("backend smoke passed");
+  console.log("backend basic smoke passed");
 }
 
 main().catch((error) => {

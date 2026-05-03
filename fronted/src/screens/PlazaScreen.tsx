@@ -1,21 +1,24 @@
 import type { PlazaPost, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface PlazaScreenProps {
   posts: PlazaPost[];
   isLoading: boolean;
   onNavigate: (screen: ScreenType) => void;
+  onRefresh: () => Promise<PlazaPost[]>;
+  onSelectPost: (post: PlazaPost) => void;
 }
 
-export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) {
+export function PlazaScreen({ posts, isLoading, onNavigate, onRefresh, onSelectPost }: PlazaScreenProps) {
   const heroPost = posts[0] ?? null;
   const gridPosts = posts.slice(1);
   const leftColItems = gridPosts.filter((_, index) => index % 2 === 0);
   const rightColItems = gridPosts.filter((_, index) => index % 2 !== 0);
 
   const renderCard = (item: PlazaPost) => (
-    <button className="square-card" key={item.id} onClick={() => onNavigate("post-detail")}>
+    <button className="square-card" key={item.id} onClick={() => onSelectPost(item)}>
       <div className="square-card-img" style={{ background: item.bgColor, aspectRatio: item.aspectRatio }}>
-        {item.imageUrl ? <img src={item.imageUrl} alt={item.title} /> : <span style={{ opacity: 0.6 }}>{item.category}图</span>}
+        {resolveMediaUrl(item.imageUrl) ? <img src={resolveMediaUrl(item.imageUrl)} alt={item.title} /> : <span>{item.category}</span>}
       </div>
       <div className="square-card-info">
         <span className="square-card-category">{item.category}</span>
@@ -35,7 +38,7 @@ export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) 
       <header className="square-header">
         <div>
           <h1>广场</h1>
-          <p>{isLoading ? "读取中" : "官方精选"}</p>
+          <p>{isLoading ? "读取中" : "精选"}</p>
         </div>
         <button className="square-camera-btn" onClick={() => onNavigate("capture")} aria-label="上传旧物">
           <svg viewBox="0 0 24 24">
@@ -47,14 +50,13 @@ export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) 
 
       <div className="square-tabs">
         <button className="square-tab active">推荐</button>
-        <button className="square-tab">表情包</button>
-        <button className="square-tab">拼豆</button>
+        <button className="square-tab" onClick={() => void onRefresh()}>刷新</button>
       </div>
 
       {heroPost && (
-        <button className="square-featured" onClick={() => onNavigate("post-detail")}>
+        <button className="square-featured" onClick={() => onSelectPost(heroPost)}>
           <div className="square-featured-img" style={{ background: heroPost.bgColor }}>
-            {heroPost.imageUrl ? <img src={heroPost.imageUrl} alt={heroPost.title} /> : <span>{heroPost.category}</span>}
+            {resolveMediaUrl(heroPost.imageUrl) ? <img src={resolveMediaUrl(heroPost.imageUrl)} alt={heroPost.title} /> : <span>{heroPost.category}</span>}
           </div>
           <div className="square-featured-copy">
             <span>{heroPost.category}</span>
@@ -69,15 +71,8 @@ export function PlazaScreen({ posts, isLoading, onNavigate }: PlazaScreenProps) 
           <div className="grid-col">{rightColItems.map(renderCard)}</div>
         </div>
       ) : (
-        <div className="square-empty">暂时没有官方精选，稍后再来看看。</div>
+        <div className="square-empty">暂时没有精选。</div>
       )}
-
-      <button className="fab-btn" onClick={() => onNavigate("publish")}>
-        <svg viewBox="0 0 24 24">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </button>
     </div>
   );
 }

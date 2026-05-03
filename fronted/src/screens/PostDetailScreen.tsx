@@ -1,19 +1,36 @@
-import type { ScreenType } from "../app/types";
+import type { PlazaPost, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface PostDetailScreenProps {
+  post: PlazaPost | null;
   onNavigate: (screen: ScreenType) => void;
 }
 
-export function PostDetailScreen({ onNavigate }: PostDetailScreenProps) {
+export function PostDetailScreen({ post, onNavigate }: PostDetailScreenProps) {
+  if (!post) {
+    return (
+      <div className="post-detail-view view-animate">
+        <div className="detail-top-bar">
+          <button className="detail-top-btn" onClick={() => onNavigate("square")} aria-label="返回广场">
+            <BackIcon />
+          </button>
+        </div>
+        <section className="post-detail-empty">
+          <h1>作品不见了</h1>
+          <button className="detail-btn detail-btn-primary" onClick={() => onNavigate("square")}>回广场</button>
+        </section>
+      </div>
+    );
+  }
+  const imageUrl = resolveMediaUrl(post.imageUrl);
+
   return (
     <div className="post-detail-view view-animate">
       <div className="detail-top-bar">
-        <button className="detail-top-btn" onClick={() => onNavigate("square")}>
-          <svg viewBox="0 0 24 24">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+        <button className="detail-top-btn" onClick={() => onNavigate("square")} aria-label="返回广场">
+          <BackIcon />
         </button>
-        <button className="detail-top-btn">
+        <button className="detail-top-btn" aria-label="更多">
           <svg viewBox="0 0 24 24" stroke="none" fill="currentColor">
             <circle cx="5" cy="12" r="2" />
             <circle cx="12" cy="12" r="2" />
@@ -22,20 +39,22 @@ export function PostDetailScreen({ onNavigate }: PostDetailScreenProps) {
         </button>
       </div>
 
-      <div className="detail-hero-img">
-        <div className="sticker-placeholder">
-          图片占位
-          <br />
-          <span style={{ fontSize: "12px", opacity: 0.7, fontWeight: 400, marginTop: "4px" }}>演唱会票根表情包</span>
-        </div>
+      <div className="detail-hero-img" style={{ background: post.bgColor }}>
+        {imageUrl ? (
+          <img src={imageUrl} alt={post.title} />
+        ) : (
+          <div className="sticker-placeholder">
+            {post.category}
+          </div>
+        )}
       </div>
 
       <div className="detail-text-content">
-        <h1 className="detail-title">一张票根做成了春天表情包</h1>
+        <h1 className="detail-title">{post.title}</h1>
         <p className="detail-meta">
-          来自演唱会票根 · <span className="highlight">@旧物收藏家</span>
+          {post.category} · <span className="highlight">@{post.author}</span>
         </p>
-        <p className="detail-desc">这张票根是去年春天留下的，后来被做成了一组可以保存、也可以分享的记忆表情。</p>
+        <p className="detail-desc">{post.description}</p>
       </div>
 
       <div className="detail-stats">
@@ -43,19 +62,13 @@ export function PostDetailScreen({ onNavigate }: PostDetailScreenProps) {
           <svg viewBox="0 0 24 24">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
-          128
+          {post.likes}
         </div>
         <div className="stat-item">
           <svg viewBox="0 0 24 24">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
           </svg>
-          89
-        </div>
-        <div className="stat-item">
-          <svg viewBox="0 0 24 24">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-          </svg>
-          26
+          {post.isOfficial ? "官方" : "入馆"}
         </div>
       </div>
 
@@ -65,18 +78,20 @@ export function PostDetailScreen({ onNavigate }: PostDetailScreenProps) {
             <path d="M11 20A7 7 0 0 1 4 13V4h9a7 7 0 0 1 7 7v9h-9Z" />
             <path d="M4 20L20 4" />
           </svg>
-          一键同款
+          我也录入
         </button>
-        <button className="detail-btn detail-btn-secondary">
-          <svg viewBox="0 0 24 24">
-            <path d="M17 2.1l4 4-4 4" />
-            <path d="M3 12.2v-2a4 4 0 0 1 4-4h14" />
-            <path d="M7 21.9l-4-4 4-4" />
-            <path d="M21 11.8v2a4 4 0 0 1-4 4H3" />
-          </svg>
-          我想交换
+        <button className="detail-btn detail-btn-secondary" onClick={() => onNavigate("square")}>
+          回广场
         </button>
       </div>
     </div>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
   );
 }

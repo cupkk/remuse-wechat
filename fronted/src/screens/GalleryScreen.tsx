@@ -32,8 +32,8 @@ export function GalleryScreen({ items, generatedAssets, onNavigate, onSelectWork
         story: item.story,
         biography,
         voiceText: item.story,
-        imageUrl: item.imageUrl,
-        isPlaceholder: !item.imageUrl
+        imageUrl: item.coverImageUrl || item.imageUrl,
+        isPlaceholder: !item.coverImageUrl && !item.imageUrl
       };
     });
   }, [generatedAssets, items]);

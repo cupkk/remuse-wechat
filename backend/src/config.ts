@@ -18,7 +18,8 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
     baseUrl: process.env.GEMINI_BASE_URL || "https://cdn.12ai.org",
     imageModel: process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview",
-    analysisModel: process.env.GEMINI_ANALYSIS_MODEL || process.env.GEMINI_IMAGE_MODEL || "gemini-3-pro-image-preview",
+    analysisModel: process.env.GEMINI_ANALYSIS_MODEL || "gemini-2.5-flash",
+    audioModel: process.env.GEMINI_AUDIO_MODEL || process.env.GEMINI_ANALYSIS_MODEL || "gemini-2.5-flash",
     timeoutMs: Number(process.env.GEMINI_IMAGE_TIMEOUT_MS || 90_000)
   },
   stepfun: {

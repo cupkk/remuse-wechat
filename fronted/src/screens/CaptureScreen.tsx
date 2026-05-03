@@ -1,6 +1,7 @@
+import type { MouseEvent, PointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GenerationKind, ItemAnalysisResult, ItemRecord, ScreenType } from "../app/types";
-import { analyzeUploadedItem, createItem, updateItem, uploadImage } from "../services/api";
+import { analyzeUploadedItem, createItem, transcribeStoryAudio, updateItem, uploadImage } from "../services/api";
 
 interface CaptureScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -11,7 +12,7 @@ interface CaptureScreenProps {
 
 type CapturePhase = "idle" | "uploading" | "analyzing" | "archiving" | "archived" | "failed";
 type StorySaveState = "idle" | "saving" | "saved" | "error";
-type VoiceState = "idle" | "listening" | "unsupported";
+type VoiceState = "idle" | "listening" | "recording" | "transcribing" | "unsupported";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -66,6 +67,8 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
   const storySaveRequestRef = useRef(0);
   const archiveRequestRef = useRef(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const storyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
   useEffect(() => {
     return () => {
       recognitionRef.current?.abort();
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
@@ -196,21 +200,26 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
       window.setTimeout(() => setArchiveSignal(false), 1700);
     } catch (error) {
       if (archiveRequestRef.current !== requestId) return;
-      setErrorText(error instanceof Error ? error.message : fallbackError);
+      setErrorText(toSafeCaptureError(error));
       setPhase("failed");
     }
   };
 
-  const handleVoiceToggle = () => {
+  const handleVoiceToggle = (event?: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
     if (voiceState === "listening") {
       recognitionRef.current?.stop();
       return;
     }
+    if (voiceState === "recording") {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    if (voiceState === "transcribing") return;
 
     const Recognition = getSpeechRecognition();
     if (!Recognition) {
-      setVoiceState("unsupported");
-      storyTextareaRef.current?.focus();
+      void startAudioRecording();
       return;
     }
 
@@ -231,7 +240,6 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
     };
     recognition.onerror = () => {
       setVoiceState("unsupported");
-      storyTextareaRef.current?.focus();
     };
     recognition.onend = () => {
       if (recognitionRef.current !== recognition) return;
@@ -245,8 +253,61 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
       setVoiceState("listening");
     } catch {
       recognitionRef.current = null;
+      void startAudioRecording();
+    }
+  };
+
+  const startAudioRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setVoiceState("unsupported");
-      storyTextareaRef.current?.focus();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setVoiceState("unsupported");
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        if (audioBlob.size < 256) {
+          setVoiceState("idle");
+          return;
+        }
+
+        setVoiceState("transcribing");
+        try {
+          const audioBase64 = await blobToBase64(audioBlob);
+          const result = await transcribeStoryAudio({ audioBase64, mimeType: audioBlob.type || "audio/webm" });
+          const nextText = result.text.trim();
+          if (nextText) {
+            setStory((current) => {
+              const trimmed = current.trim();
+              return trimmed ? `${trimmed}\n${nextText}` : nextText;
+            });
+          }
+          setVoiceState("idle");
+        } catch {
+          setVoiceState("unsupported");
+        }
+      };
+
+      recorder.start();
+      setVoiceState("recording");
+    } catch {
+      setVoiceState("unsupported");
     }
   };
 
@@ -351,15 +412,19 @@ export function CaptureScreen({ onNavigate, onItemCreated, onItemUpdated, onStar
       {selectedFile && (
         <section className="capture-story-panel">
           <div className="capture-story-head">
-            <button className={`capture-mic-btn ${voiceState === "listening" ? "is-listening" : ""}`} onClick={handleVoiceToggle}>
+            <button
+              className={`capture-mic-btn ${voiceState === "listening" || voiceState === "recording" ? "is-listening" : ""}`}
+              type="button"
+              onClick={handleVoiceToggle}
+            >
               <svg viewBox="0 0 24 24">
                 <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
                 <path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" />
               </svg>
             </button>
             <div>
-              <strong>{voiceState === "listening" ? "正在听" : "旧物故事"}</strong>
-              <span>{voiceState === "unsupported" ? "可直接输入" : storyStatus}</span>
+              <strong>{voiceState === "listening" || voiceState === "recording" ? "正在听" : "旧物故事"}</strong>
+              <span>{getVoiceStatusText(voiceState, storyStatus)}</span>
             </div>
           </div>
           <textarea
@@ -416,6 +481,34 @@ function normalizeGenerationKind(kind?: GenerationKind): GenerationKind {
 function normalizeRecommendations(kinds?: GenerationKind[]): GenerationKind[] {
   const normalized = (kinds || []).map(normalizeGenerationKind);
   return Array.from(new Set(normalized.length ? normalized : ["emoji", "guide", "perler"]));
+}
+
+function getVoiceStatusText(voiceState: VoiceState, storyStatus: string) {
+  if (voiceState === "recording") return "再点一次结束";
+  if (voiceState === "transcribing") return "转文字中";
+  if (voiceState === "unsupported") return "可直接输入";
+  return storyStatus;
+}
+
+function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      resolve(result.split(",")[1] || "");
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function toSafeCaptureError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (!message) return fallbackError;
+  if (message.includes("{") || message.includes("openai_error") || message.includes("message") || message.length > 80) {
+    return fallbackError;
+  }
+  return message;
 }
 
 function NextActionIcon({ kind }: { kind: GenerationKind }) {

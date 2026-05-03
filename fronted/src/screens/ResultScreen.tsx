@@ -1,4 +1,5 @@
 import type { GenerationKind, ItemAnalysisResult, ItemRecord, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface ResultScreenProps {
   currentItem: ItemRecord | null;
@@ -28,6 +29,7 @@ export function ResultScreen({ currentItem, analysis, onNavigate, onStartGenerat
   const value = analysis?.rarityAndValue;
   const primaryKind = normalizeGenerationKind(analysis?.primaryRecommendation);
   const features = analysis?.itemRecognition.visualFeatures?.filter(Boolean).slice(0, 3) || [];
+  const itemImageUrl = resolveMediaUrl(currentItem?.imageUrl);
 
   return (
     <div className="result-view view-animate">
@@ -57,7 +59,7 @@ export function ResultScreen({ currentItem, analysis, onNavigate, onStartGenerat
       <section className="quick-generate-panel" aria-label="生成能力">
         <div className="quick-generate-center">
           <div className="quick-object">
-            {currentItem?.imageUrl ? <img src={currentItem.imageUrl} alt={itemName} /> : <span>{itemName.slice(0, 2)}</span>}
+            {itemImageUrl ? <img src={itemImageUrl} alt={itemName} /> : <span>{itemName.slice(0, 2)}</span>}
           </div>
           <div>
             <strong>{itemName}</strong>

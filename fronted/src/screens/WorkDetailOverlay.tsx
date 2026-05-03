@@ -1,5 +1,6 @@
 import { Icons } from "../components/Icons";
 import type { GenerationKind, Work } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface WorkDetailOverlayProps {
   selectedWork: Work;
@@ -20,6 +21,7 @@ export function WorkDetailOverlay({
   const story = selectedWork.story?.trim() || "故事还在路上。";
   const biography = selectedWork.biography?.trim() || selectedWork.description || "这件旧物已经被收入展馆。";
   const voiceText = selectedWork.voiceText?.trim() || selectedWork.story?.trim() || "";
+  const imageUrl = resolveMediaUrl(selectedWork.imageUrl);
 
   return (
     <div className={`video-detail-overlay vd-archive-detail ${selectedWork.isPlaceholder ? "is-placeholder" : ""} overlay-animate`}>
@@ -35,7 +37,7 @@ export function WorkDetailOverlay({
           </div>
         </div>
         {hasImage ? (
-          <img className="vd-hero-image" src={selectedWork.imageUrl || ""} alt={selectedWork.title} />
+          <img className="vd-hero-image" src={imageUrl} alt={selectedWork.title} />
         ) : (
           <div className="vd-empty-card" aria-hidden="true">
             <span />

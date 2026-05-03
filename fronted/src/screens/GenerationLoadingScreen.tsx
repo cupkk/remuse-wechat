@@ -1,4 +1,5 @@
 import type { GenerationKind, ItemRecord, ScreenType } from "../app/types";
+import { resolveMediaUrl } from "../services/api";
 
 interface GenerationLoadingScreenProps {
   kind: GenerationKind;
@@ -18,6 +19,7 @@ const loadingLabels: Record<GenerationKind, string> = {
 
 export function GenerationLoadingScreen({ kind, item, errorText, isGenerating, onNavigate, onRetry }: GenerationLoadingScreenProps) {
   const failed = Boolean(errorText) && !isGenerating;
+  const itemImageUrl = resolveMediaUrl(item?.imageUrl);
 
   return (
     <div className={`generation-loading-view ${failed ? "is-failed" : "is-generating"} view-animate`}>
@@ -38,7 +40,7 @@ export function GenerationLoadingScreen({ kind, item, errorText, isGenerating, o
           <div className="sensory-ring sensory-ring-three" />
           <div className="sensory-scan" />
           <div className="sensory-orb">
-            {item?.imageUrl ? <img src={item.imageUrl} alt="" /> : <GenerationGlyph kind={kind} />}
+            {itemImageUrl ? <img src={itemImageUrl} alt="" /> : <GenerationGlyph kind={kind} />}
           </div>
           <div className="sensory-particles">
             {Array.from({ length: 16 }).map((_, index) => (

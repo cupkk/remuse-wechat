@@ -14,6 +14,7 @@ export interface ItemRecord {
   category: string;
   story: string;
   imageUrl: string | null;
+  coverImageUrl: string | null;
   analysisJson: string | null;
   createdAt: string;
 }
@@ -56,4 +57,8 @@ export interface PlazaPostRecord {
   bgColor: string;
   aspectRatio: string;
   description: string;
+  itemId?: string | null;
+  generatedAssetId?: string | null;
+  isOfficial?: boolean;
+  createdAt?: string;
 }
